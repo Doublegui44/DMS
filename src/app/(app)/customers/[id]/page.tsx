@@ -1,0 +1,115 @@
+import Link from "next/link";
+import { getTranslations } from "next-intl/server";
+import { Pencil } from "lucide-react";
+import { getRequestContext, query } from "@/lib/session";
+import { can } from "@/lib/rbac";
+import { getCustomer, getTimeline } from "@/modules/core";
+import { Fields, PageHeader, Section } from "@/components/shared/page-header";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { Timeline } from "@/components/shared/timeline";
+import { Button } from "@/components/ui/button";
+import { ContactsPanel } from "./contacts-panel";
+
+export default async function CustomerPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const t = await getTranslations();
+  const { actor } = await getRequestContext();
+  const [c, timeline] = await Promise.all([
+    query((ctx) => getCustomer(ctx, id)),
+    query((ctx) => getTimeline(ctx, "Customer", id)),
+  ]);
+  const canEdit = can(actor.permissions, "customer", "edit");
+  const yes = t("common.yes");
+  const no = t("common.no");
+
+  return (
+    <div>
+      <PageHeader
+        title={c.displayName}
+        subtitle={`${c.number} · ${t("customer.account")} ${c.accountCode}`}
+        backHref="/customers"
+        badges={
+          <>
+            <StatusBadge status={c.kind} label={t(`customer.kinds.${c.kind}`)} />
+            <StatusBadge status="gray" tone="gray" label={t(`customer.priceClasses.${c.priceClass}`)} />
+          </>
+        }
+        actions={
+          canEdit && (
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/customers/${id}/edit`}>
+                <Pencil /> {t("common.edit")}
+              </Link>
+            </Button>
+          )
+        }
+      />
+      <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
+        <div className="space-y-4">
+          <Section title={t("common.details")}>
+            <Fields
+              items={[
+                ...(c.kind === "INDIVIDUAL"
+                  ? [{ label: t("customer.name"), value: [c.title, c.firstName, c.lastName].filter(Boolean).join(" ") }]
+                  : [
+                      { label: t("customer.siren"), value: c.siren },
+                      { label: t("customer.vatNumber"), value: c.vatNumber },
+                    ]),
+                { label: t("customer.email"), value: c.email },
+                { label: t("customer.phone"), value: c.phone },
+                { label: t("customer.address"), value: [c.address, `${c.postalCode ?? ""} ${c.city ?? ""}`.trim(), c.countryCode].filter(Boolean).join(", ") },
+                { label: t("customer.homeSite"), value: c.homeSite?.name },
+                { label: t("customer.paymentTerms"), value: c.paymentTermsDays },
+                {
+                  label: t("customer.consents"),
+                  value: `${t("customer.consentEmail")}: ${c.consentEmail ? yes : no} · ${t("customer.consentSms")}: ${c.consentSms ? yes : no} · ${t("customer.consentPhone")}: ${c.consentPhone ? yes : no}`,
+                },
+                ...(c.notes ? [{ label: t("customer.notes"), value: c.notes }] : []),
+              ]}
+            />
+          </Section>
+
+          {c.kind !== "INDIVIDUAL" && (
+            <Section title={t("customer.contacts")}>
+              <ContactsPanel
+                customerId={c.id}
+                canEdit={canEdit}
+                contacts={c.contacts.map((ct) => ({
+                  id: ct.id,
+                  name: `${ct.firstName} ${ct.lastName}`,
+                  role: ct.role,
+                  email: ct.email,
+                  phone: ct.phone,
+                  isPrimary: ct.isPrimary,
+                }))}
+              />
+            </Section>
+          )}
+
+          <Section title={`${t("customer.vehicles")} (${c.vehicles.length})`}>
+            {c.vehicles.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t("common.noResults")}</p>
+            ) : (
+              <ul className="divide-y text-[13px]">
+                {c.vehicles.map((v) => (
+                  <li key={v.id} className="flex items-center justify-between py-1.5">
+                    <Link href={`/vehicles/${v.id}`} className="font-medium text-primary hover:underline">
+                      {v.make} {v.model} <span className="font-normal text-muted-foreground">{v.version}</span>
+                    </Link>
+                    <span className="flex items-center gap-3 text-muted-foreground">
+                      <span className="font-mono text-xs">{v.registration ?? v.vin}</span>
+                      <span className="tabular-nums">{v.mileage.toLocaleString("en-GB")} km</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
+        </div>
+        <Section title={t("common.timeline")}>
+          <Timeline items={timeline} />
+        </Section>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,490 @@
+// DMS Simulator — Prisma schema
+// Conventions: money in Int cents (*Cents), rates in basis points (*Bp),
+// labour time in centi-hours, tables mapped to snake_case.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Core: organisation
+// ─────────────────────────────────────────────────────────────
+
+model Group {
+  id        String   @id @default(cuid())
+  name      String
+  legalName String
+  siren     String?
+  vatNumber String?
+  createdAt DateTime @default(now())
+  sites     Site[]
+  brands    Brand[]
+
+  @@map("group")
+}
+
+model Country {
+  code          String    @id // ISO 3166-1 alpha-2
+  name          String
+  currency      String    @default("EUR")
+  defaultLocale String    @default("fr-FR")
+  sites         Site[]
+  vatRates      VatRate[]
+
+  @@map("country")
+}
+
+model VatRate {
+  id          String    @id @default(cuid())
+  countryCode String
+  code        String // STANDARD, INTERMEDIATE, REDUCED, ZERO
+  label       String
+  rateBp      Int // 2000 = 20.00 %
+  validFrom   DateTime  @db.Date
+  validTo     DateTime? @db.Date
+  country     Country   @relation(fields: [countryCode], references: [code])
+
+  @@unique([countryCode, code, validFrom])
+  @@map("vat_rate")
+}
+
+model Site {
+  id               String       @id @default(cuid())
+  groupId          String
+  code             String       @unique // NTE, REN, ANG
+  slug             String       @unique // nantes, rennes, angers
+  name             String
+  address          String
+  postalCode       String
+  city             String
+  countryCode      String
+  phone            String?
+  siret            String?
+  labourRateCents  Int // customer labour rate excl. VAT per hour
+  createdAt        DateTime     @default(now())
+  group            Group        @relation(fields: [groupId], references: [id])
+  country          Country      @relation(fields: [countryCode], references: [code])
+  brands           SiteBrand[]
+  departments      Department[]
+  userRoles        UserRole[]
+  vehicles         Vehicle[]
+  auditLogs        AuditLog[]
+  domainEvents     DomainEvent[]
+  settings         Setting[]
+  customers        Customer[]   @relation("CustomerHomeSite")
+
+  @@map("site")
+}
+
+model Brand {
+  id            String      @id @default(cuid())
+  groupId       String
+  code          String      @unique
+  name          String
+  oemCustomerId String?     @unique // OEM as a customer (warranty receivables)
+  group         Group       @relation(fields: [groupId], references: [id])
+  sites         SiteBrand[]
+  vehicles      Vehicle[]
+  oemCustomer   Customer?   @relation("BrandOemCustomer", fields: [oemCustomerId], references: [id])
+
+  @@map("brand")
+}
+
+model SiteBrand {
+  siteId  String
+  brandId String
+  site    Site   @relation(fields: [siteId], references: [id])
+  brand   Brand  @relation(fields: [brandId], references: [id])
+
+  @@id([siteId, brandId])
+  @@map("site_brand")
+}
+
+enum DepartmentCode {
+  VN
+  VO
+  WORKSHOP
+  PARTS
+  ACCOUNTING
+  OVERHEAD
+}
+
+model Department {
+  id     String         @id @default(cuid())
+  siteId String
+  code   DepartmentCode
+  name   String
+  site   Site           @relation(fields: [siteId], references: [id])
+
+  @@unique([siteId, code])
+  @@map("department")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Admin: users, roles, permissions, approvals
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id             String            @id @default(cuid())
+  email          String            @unique
+  passwordHash   String
+  firstName      String
+  lastName       String
+  phone          String?
+  isTechnician   Boolean           @default(false)
+  active         Boolean           @default(true)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  roles          UserRole[]
+  auditLogs      AuditLog[]
+  approvalsMade  ApprovalRequest[] @relation("ApprovalDecider")
+  approvalsAsked ApprovalRequest[] @relation("ApprovalRequester")
+
+  @@map("user")
+}
+
+model Role {
+  id            String           @id @default(cuid())
+  key           String           @unique // ADMIN, DEALER_PRINCIPAL, …
+  name          String
+  description   String?
+  permissions   RolePermission[]
+  users         UserRole[]
+  approvalRules ApprovalRule[]
+
+  @@map("role")
+}
+
+enum PermissionAction {
+  view
+  create
+  edit
+  validate
+  delete
+}
+
+model Permission {
+  id       String           @id @default(cuid())
+  resource String // e.g. "sales.order"
+  action   PermissionAction
+  roles    RolePermission[]
+
+  @@unique([resource, action])
+  @@map("permission")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permission")
+}
+
+/// A role granted to a user, either on one site or on all sites (siteId = null).
+model UserRole {
+  id     String  @id @default(cuid())
+  userId String
+  roleId String
+  siteId String?
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role    @relation(fields: [roleId], references: [id])
+  site   Site?   @relation(fields: [siteId], references: [id])
+
+  @@unique([userId, roleId, siteId])
+  @@map("user_role")
+}
+
+model ApprovalRule {
+  id             String            @id @default(cuid())
+  key            String // e.g. "deal.discount"
+  label          String
+  thresholdBp    Int? // percentage threshold in basis points
+  thresholdCents Int? // amount threshold
+  approverRoleId String
+  active         Boolean           @default(true)
+  approverRole   Role              @relation(fields: [approverRoleId], references: [id])
+  requests       ApprovalRequest[]
+
+  @@unique([key, approverRoleId])
+  @@map("approval_rule")
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model ApprovalRequest {
+  id            String         @id @default(cuid())
+  ruleId        String
+  entityType    String
+  entityId      String
+  siteId        String
+  status        ApprovalStatus @default(PENDING)
+  requestedById String
+  decidedById   String?
+  decidedAt     DateTime?
+  comment       String?
+  businessDate  DateTime       @db.Date
+  createdAt     DateTime       @default(now())
+  rule          ApprovalRule   @relation(fields: [ruleId], references: [id])
+  requestedBy   User           @relation("ApprovalRequester", fields: [requestedById], references: [id])
+  decidedBy     User?          @relation("ApprovalDecider", fields: [decidedById], references: [id])
+
+  @@index([entityType, entityId])
+  @@map("approval_request")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Core: customers
+// ─────────────────────────────────────────────────────────────
+
+enum CustomerKind {
+  INDIVIDUAL
+  COMPANY
+  OEM
+}
+
+enum PriceClass {
+  RETAIL
+  TRADE
+  INTERNAL
+  WARRANTY
+}
+
+model Customer {
+  id            String       @id @default(cuid())
+  number        String       @unique // C000123
+  kind          CustomerKind
+  // individuals
+  title         String?
+  firstName     String?
+  lastName      String?
+  // companies
+  companyName   String?
+  siren         String?
+  vatNumber     String?
+  // shared
+  displayName   String // denormalised for search & lists
+  email         String?
+  phone         String?
+  address       String?
+  postalCode    String?
+  city          String?
+  countryCode   String       @default("FR")
+  priceClass    PriceClass   @default(RETAIL)
+  paymentTermsDays Int       @default(0)
+  accountCode   String // auxiliary customer account, e.g. 411C000123
+  consentEmail  Boolean      @default(false)
+  consentSms    Boolean      @default(false)
+  consentPhone  Boolean      @default(false)
+  homeSiteId    String?
+  notes         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  homeSite      Site?        @relation("CustomerHomeSite", fields: [homeSiteId], references: [id])
+  contacts      Contact[]
+  vehicles      Vehicle[]
+  oemOfBrand    Brand?       @relation("BrandOemCustomer")
+
+  @@index([displayName])
+  @@map("customer")
+}
+
+model Contact {
+  id         String   @id @default(cuid())
+  customerId String
+  firstName  String
+  lastName   String
+  role       String?
+  email      String?
+  phone      String?
+  isPrimary  Boolean  @default(false)
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@map("contact")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Core: vehicles
+// ─────────────────────────────────────────────────────────────
+
+enum StockType {
+  VN
+  VO
+  NONE // customer vehicle, not in dealer stock
+}
+
+enum VehicleStatus {
+  // VN lifecycle
+  ORDERED
+  IN_TRANSIT
+  IN_STOCK
+  // VO lifecycle
+  INTAKE
+  RECONDITIONING
+  FOR_SALE
+  // shared
+  RESERVED
+  SOLD
+  DELIVERED
+  // not in stock (customer-owned, seen in workshop)
+  CUSTOMER
+}
+
+enum FuelType {
+  PETROL
+  DIESEL
+  HYBRID
+  PLUGIN_HYBRID
+  ELECTRIC
+  LPG
+}
+
+enum VatRegime {
+  STANDARD
+  MARGIN
+}
+
+model Vehicle {
+  id                String                 @id @default(cuid())
+  vin               String                 @unique
+  registration      String?                @unique
+  brandId           String?
+  make              String // denormalised: works for non-franchise makes too
+  model             String
+  version           String
+  firstRegistration DateTime?              @db.Date
+  mileage           Int                    @default(0)
+  fuel              FuelType
+  co2               Int? // g/km
+  powerHp           Int?
+  colour            String?
+  stockType         StockType
+  status            VehicleStatus
+  siteId            String?
+  ownerCustomerId   String?
+  listPriceCents    Int? // selling price incl. VAT for stock vehicles
+  stockValueCents   Int                    @default(0)
+  stockInDate       DateTime?              @db.Date
+  vatRegime         VatRegime              @default(STANDARD)
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  brand             Brand?                 @relation(fields: [brandId], references: [id])
+  site              Site?                  @relation(fields: [siteId], references: [id])
+  owner             Customer?              @relation(fields: [ownerCustomerId], references: [id])
+  options           VehicleOption[]
+  statusHistory     VehicleStatusHistory[]
+
+  @@index([status, stockType])
+  @@index([siteId])
+  @@map("vehicle")
+}
+
+model VehicleOption {
+  id         String  @id @default(cuid())
+  vehicleId  String
+  code       String
+  label      String
+  priceCents Int     @default(0)
+  vehicle    Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@map("vehicle_option")
+}
+
+model VehicleStatusHistory {
+  id           String         @id @default(cuid())
+  vehicleId    String
+  fromStatus   VehicleStatus?
+  toStatus     VehicleStatus
+  businessDate DateTime       @db.Date
+  userId       String?
+  reason       String?
+  createdAt    DateTime       @default(now())
+  vehicle      Vehicle        @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
+  @@map("vehicle_status_history")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Core: numbering, audit, events, clock, settings
+// ─────────────────────────────────────────────────────────────
+
+/// Gap-free counter. scope = site id, or "GROUP" for group-wide series.
+model DocumentSequence {
+  scope      String
+  docType    String // INVOICE, CREDIT_NOTE, CUSTOMER, SALES_ORDER, RO, …
+  fiscalYear Int // 0 for series that never reset
+  prefix     String
+  padding    Int    @default(6)
+  nextValue  Int    @default(1)
+
+  @@id([scope, docType, fiscalYear])
+  @@map("document_sequence")
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  at           DateTime @default(now())
+  businessDate DateTime @db.Date
+  userId       String?
+  siteId       String?
+  action       String // e.g. "customer.create"
+  entityType   String
+  entityId     String
+  before       Json?
+  after        Json?
+  user         User?    @relation(fields: [userId], references: [id])
+  site         Site?    @relation(fields: [siteId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([at])
+  @@map("audit_log")
+}
+
+model DomainEvent {
+  id            String   @id @default(cuid())
+  type          String
+  siteId        String?
+  aggregateType String
+  aggregateId   String
+  payload       Json
+  businessDate  DateTime @db.Date
+  userId        String?
+  createdAt     DateTime @default(now())
+  site          Site?    @relation(fields: [siteId], references: [id])
+
+  @@index([aggregateType, aggregateId])
+  @@index([type])
+  @@map("domain_event")
+}
+
+model BusinessClock {
+  id          Int      @id @default(1)
+  currentDate DateTime @db.Date
+  updatedAt   DateTime @updatedAt
+
+  @@map("business_clock")
+}
+
+/// Key/value settings. siteId = null means group-wide default.
+model Setting {
+  id     String  @id @default(cuid())
+  key    String
+  siteId String?
+  value  Json
+  site   Site?   @relation(fields: [siteId], references: [id])
+
+  @@unique([key, siteId])
+  @@map("setting")
+}
