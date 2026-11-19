@@ -58,3 +58,36 @@ Forms post `FormData` to server actions (`ActionForm`, `useActionState`); field 
 
 ## D-019 — Forbidden reads redirect to /forbidden
 `query()` turns a `ForbiddenError` into a redirect to `/forbidden`, so typing a URL to a screen the role cannot see shows a clear page instead of a 500.
+
+## D-020 — Balance and immutability also enforced in Postgres
+A deferred constraint trigger (`journal_entry_balanced`, checked at commit) rejects any entry with fewer than two lines or debit ≠ credit; a `CHECK` keeps each line one-sided and non-negative. Row triggers make `journal_entry` immutable and allow only `letteringCode` to change on `journal_line`; inserts and deletes into a locked period raise `PERIOD_LOCKED`. The service still validates first (clear messages, all errors at once); the database is the backstop for raw SQL, future code paths and the simulator.
+
+## D-021 — Collective GL accounts with party on the line
+Customers post to collective accounts (411000, 411100 for OEMs) and suppliers to 401000 / 401100; the auxiliary ledger is `partyType` + `partyId` on each line, and receivable/payable accounts refuse a line without the right party. `Customer.accountCode` / `Supplier.accountCode` are the auxiliary codes used for display and, later, the FEC `CompAuxNum` column. No per-customer account rows, so the chart stays small.
+
+## D-022 — Number series
+Journal entries: one gap-free series per journal and fiscal year, group-wide (`VE-2026-000001`), year taken from the entry date. Invoices and credit notes: per site (`NTE-FA-2026-…`, `NTE-AV-2026-…`), numbered at issue. Receipts `RC` and disbursements `RG` per site. Suppliers `F00001`. All through `nextDocumentNumber` (D-007), so a rolled-back command leaves no gap.
+
+## D-023 — Invoices post directly; operational modules call accounting
+`issueInvoice` takes the number, posts the sales entry through `postEntry` and links it, all in the caller's transaction; it then emits `InvoiceIssued` for other modules. No event handler is involved because posting is inside the accounting module. Sales/workshop/parts will call `createAndIssueInvoice(ctx, input, { trusted: true })` after checking their own permission (a salesperson delivering a car cannot hold `accounting.invoice:validate`). The first cross-module *handler* (and its registration module) is still to come with Phase 3.
+
+## D-024 — Supplier is a core party
+`Supplier` sits next to `Customer` in core (group-wide, created with `createSupplier`); each brand points to its OEM as a customer (warranty receivables) and as a supplier (vehicle and parts purchases).
+
+## D-025 — Corrections: reversal for manual entries, credit note for invoices
+`reverseEntry` mirrors a manual or opening entry at the business date and links both ways; generated entries (invoices, payments) cannot be reversed directly. `creditInvoice` issues a full credit note that offsets what is still due on the invoice; any surplus stays open on the credit note and is refunded with an `OUT` payment allocated to it.
+
+## D-026 — Lettering
+Lettering follows settlement: after a payment allocation or a credit note, `letterSettlement` walks the settlement group (invoices ↔ allocated payments ↔ credit notes) and, once every document in it is fully settled, letters the group's receivable lines together (codes A…Z, AA…, per account and party). One unpaid invoice therefore never blocks lettering of the others, and lettering always matches invoice status. Accountants can letter any zero-sum selection by hand (e.g. supplier lines, payments on account) and unletter a code. Lettering is not a posting, so it is allowed in locked periods.
+
+## D-027 — Periods and close
+Monthly periods are created on first use (`ensurePeriod`) and by the seed. Locking requires: period open, every earlier period that holds entries locked, the business date past month end, and the period's trial balance balanced; draft invoices only warn. `lockedAt` records the business date. Reopening needs `accounting.period:delete` (admin only), a reason, and no later locked period.
+
+## D-028 — Accounting seed: opening entry plus light history
+Until vehicle purchases are posted (Phase 3) and the simulator generates history (Phase 7, D-010), the seed posts an opening entry per site (journal AN) at the start of the six-month window: current VN/VO stock values on 371000/372000 (so 37x equals the vehicle sub-ledger), bank and capital, difference to 110000. It then generates workshop and warranty invoices, receipts, rent and salaries day by day through the services, and locks every month except the last finished one.
+
+## D-029 — Dynamic-line forms call server actions with plain objects
+Manual entries, invoices and payments have a variable number of lines, so these forms are client components that pass a typed object to the server action instead of `FormData`. The action only converts euro strings to cents (`parseEuros`); validation stays in the service (D-018 still applies to fixed forms).
+
+## D-030 — Preview against the e2e database
+`.claude/launch.json` has a `dms-e2e-preview` server (`.next-preview`, `.env.e2e`) to look at screens with seeded data without resetting `dms_dev`. Playwright resets `dms_e2e` on every run, so stop the preview before running e2e tests.

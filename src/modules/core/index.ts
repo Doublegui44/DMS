@@ -5,6 +5,8 @@ export * from "./domain/numbering";
 export { customerInputSchema, contactInputSchema, type CustomerInput, type ContactInput } from "./schemas/customer";
 export { vehicleInputSchema, vehicleStatusChangeSchema, type VehicleInput } from "./schemas/vehicle";
 export { createCustomer, updateCustomer, addContact, removeContact } from "./services/customers";
+export { supplierInputSchema, type SupplierInput } from "./schemas/supplier";
+export { createSupplier } from "./services/suppliers";
 export { createVehicle, updateVehicle, changeVehicleStatus } from "./services/vehicles";
 export { nextDocumentNumber } from "./services/numbering";
 export { setBusinessDate, advanceBusinessDay } from "./services/clock";

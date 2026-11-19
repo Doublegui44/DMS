@@ -26,15 +26,17 @@ Each phase ends with: migrations applied, seed updated, tests green, app running
 - **Done when:** you can log in with each role and menus are filtered by permission → verified by `tests/e2e/auth-rbac.spec.ts` (18 tests)
 - Deferred: Admin settings are read-only (editing arrives with the modules that use each setting); user create/edit UI (service exists, used by seed).
 
-## Phase 2 — Accounting engine
-- [ ] Chart of accounts (PCG seed, configurable), journals, fiscal periods, account mapping
-- [ ] Posting service: balance check, analytic check, period check (+ DB trigger), gap-free entry numbers, reversal
-- [ ] Invoice + credit note issuing service (generic, numbering at issue)
-- [ ] Payments and allocation (lettering), customer/supplier ledgers
-- [ ] Period lock/reopen with checklist
-- [ ] Screens: chart of accounts, journal entries list/detail, manual OD entry, periods
-- [ ] Tests: every entry builder balances; unbalanced rejected; locked period rejected (service + DB)
-- **Done when:** unit tests prove every entry balances and locked periods reject postings
+## Phase 2 — Accounting engine ✅
+- [x] Chart of accounts (PCG seed, configurable), journals, fiscal periods, account mapping (site + brand → site → brand → global)
+- [x] Posting service: balance check, analytic check, party check, period check (+ DB triggers), gap-free entry numbers, reversal
+- [x] Invoice + credit note issuing service (generic, numbering at issue, standard and margin VAT)
+- [x] Payments and allocation, automatic and manual lettering, customer/supplier ledgers
+- [x] Period lock/reopen with checklist
+- [x] Screens: invoices (list, detail, new, credit note), payments (list, detail, record + allocate), journal entries (list, detail, manual OD with live balance, reversal), ledgers + statements with lettering, trial balance, chart of accounts (list, detail, create/edit), periods; account summary on the customer page; CSV exports
+- [x] Seed: chart, journals, mappings, periods, suppliers, opening balances, six months of workshop/warranty invoices, receipts and overheads; earlier months locked
+- [x] Tests: every entry builder balances (incl. 200 random invoices); unbalanced rejected; locked period rejected (service + DB); e2e invoice → payment → paid, manual OD balance, period lock
+- **Done when:** unit tests prove every entry balances and locked periods reject postings → `tests/unit/accounting-domain.test.ts`, `tests/integration/accounting.test.ts`, `tests/e2e/accounting.spec.ts`
+- Deferred: account-mapping editor UI (service `setAccountMapping` exists), supplier invoices (arrive with purchasing in Phases 3–4), FEC/VAT reports (Phase 6), payment cancellation.
 
 ## Phase 3 — VN / VO sales
 - [ ] OEM catalogue (models, versions, options, list prices), configurator

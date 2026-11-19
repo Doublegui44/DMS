@@ -20,7 +20,16 @@ export const DEFAULT_SEQUENCES: Record<string, SequenceDefinition> = {
   COUNTER_SALE: { prefix: "VC", padding: 5, yearly: true },
   WARRANTY_CLAIM: { prefix: "GA", padding: 5, yearly: true },
   POLICE_REGISTER: { prefix: "LP", padding: 5, yearly: false },
+  SUPPLIER: { prefix: "F", padding: 5, yearly: false },
+  RECEIPT: { prefix: "RC", padding: 6, yearly: true },
+  DISBURSEMENT: { prefix: "RG", padding: 6, yearly: true },
 };
+
+/** Journal entry series: one gap-free counter per journal and fiscal year (e.g. VE-2026-000001). */
+export function sequenceDefinition(docType: string): SequenceDefinition | undefined {
+  if (docType.startsWith("JOURNAL_")) return { prefix: docType.slice("JOURNAL_".length), padding: 6, yearly: true };
+  return DEFAULT_SEQUENCES[docType];
+}
 
 export function formatDocumentNumber(args: { prefix: string; fiscalYear: number; padding: number; value: number }): string {
   if (!Number.isInteger(args.value) || args.value < 1) throw new RangeError(`Invalid sequence value ${args.value}`);

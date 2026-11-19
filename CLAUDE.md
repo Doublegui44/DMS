@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # DMS Simulator
 
 Web simulator of a French multi-site car dealer group's Dealer Management System (VN/VO sales, workshop, parts, accounting, admin). For demos, training and workflow testing. **Every operational action must have its downstream effects** (stock, invoice, journal entries, KPIs), in one transaction.
@@ -8,13 +12,13 @@ Web simulator of a French multi-site car dealer group's Dealer Management System
 
 ## Current phase
 
-**Phase 1 done** (setup, auth, RBAC, shared core, app shell, seed v1). **Next: Phase 2 — accounting engine.**
+**Phase 2 done** (accounting engine). **Next: Phase 3 — VN / VO sales.**
 
-What exists: `src/lib` (money, context/runCommand, event bus, rbac, list params, csv, session), `src/modules/core` (customers, vehicles, numbering, clock, timeline, dashboard), `src/modules/admin` (roles matrix, users, audit), screens for dashboard, customers, vehicles, admin users/roles/settings/audit. Later-phase screens show a placeholder (`src/app/(app)/[...placeholder]`).
+Built so far: `src/modules/core` (customers, suppliers, vehicles, numbering, clock, timeline, dashboard), `src/modules/admin` (role matrix, users, audit) and `src/modules/accounting` (chart, mappings, posting, periods, invoices/credit notes, payments, lettering, ledgers, trial balance). Every other menu entry is a placeholder until its phase.
 
 ## Stack
 
-Next.js 15 (App Router, Server Actions) · TypeScript strict · Tailwind v4 + shadcn/ui · TanStack Table · Recharts · Prisma 6 + PostgreSQL 17 (local Homebrew) · Auth.js v5 credentials · Zod · next-intl · @react-pdf/renderer · Faker (fr) · Vitest · Playwright · npm · Node 24
+Next.js 15 (App Router, Server Actions) · TypeScript strict · Tailwind v4 + shadcn/ui (radix-nova) · TanStack Table 8 · Prisma 6 + PostgreSQL 17 (local Homebrew) · Auth.js v5 beta (credentials) · Zod 3 · next-intl · Faker (fr) · Vitest 3 · Playwright · npm · Node 24. Majors are pinned on purpose (D-014). Recharts and @react-pdf/renderer are planned (Phases 6) but not installed yet.
 
 ## Commands
 
@@ -29,10 +33,34 @@ Next.js 15 (App Router, Server Actions) · TypeScript strict · Tailwind v4 + sh
 | `npm run lint` / `npm run typecheck` | ESLint (incl. module-boundary + no-wall-clock rules) / `tsc --noEmit` |
 | `npm run simulate -- --days 30 --site nantes` | Scenario runner (Phase 7, not built yet) |
 
+Single tests:
+- `npx vitest run tests/unit/money.test.ts` · `npx vitest run -t "gap-free"` (integration files need local Postgres; `tests/integration/global-setup.ts` runs `prisma migrate deploy` on `dms_test` first)
+- `npx playwright test -g "TECHNICIAN"` (always restarts its own server on :3100 and reseeds `dms_e2e`, ~30 s)
+- After editing `prisma/schema.prisma`: `npm run db:migrate -- --name <name>` (regenerates the client).
+
 Databases (local Homebrew Postgres 17, socket `/tmp`): `dms_dev` (.env), `dms_test` (.env.test), `dms_e2e` (.env.e2e).
 `prisma migrate reset` is blocked for AI agents by Prisma; use `npm run db:reset`, and ask the user before resetting `dms_dev`.
+`prisma migrate dev` needs an interactive terminal. Non-interactively, generate the SQL with `npx prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url "postgresql://$USER@localhost:5432/dms_shadow?host=/tmp" --script > prisma/migrations/<timestamp>_<name>/migration.sql` (append hand-written triggers there), then `npx prisma migrate deploy` per database (`DATABASE_URL` override) and `npx prisma generate`.
+To look at screens with seeded data without touching `dms_dev`, start the `dms-e2e-preview` launch config (`.env.e2e`, `.next-preview`); stop it before `npm run test:e2e`, which resets `dms_e2e`.
 
 Demo users: every seeded user's password is `demo1234` (dev only). Emails: `admin@dms.test`, `dealer.principal@dms.test`, `accountant@dms.test`, `sales.manager.<site>@dms.test`, `salesperson{1,2}.<site>`, `service.manager.<site>`, `service.advisor.<site>`, `technician{1,2}.<site>`, `parts.manager.<site>`, `parts.advisor.nantes` (site = nantes | rennes | angers). With `DEMO_MODE=true` the login page and top bar offer one-click user switching.
+
+## Architecture (big picture)
+
+Read `docs/ARCHITECTURE.md` for the ERDs, posting rules and module map. The parts that span several files:
+
+- **Request flow.** `src/lib/session.ts` is the only bridge between Next.js and the service layer: `getRequestContext()` (cached per request) reads the Auth.js session, loads the `Actor` (roles → `PermissionSet` via `src/lib/actor.ts`) and the active site from the `dms_site` cookie. Pages call `query(fn, permission?)` (a `ForbiddenError` redirects to `/forbidden`). Server actions call `command(fn, permission?)`, which returns an `ActionResult` and never throws domain errors to the client.
+- **ServiceContext** (`src/lib/context.ts`). `runCommand({ actor, siteId, permission?, businessDate? }, fn)` opens one Prisma interactive transaction and hands `fn` a `ctx` with `tx`, `businessDate` (read from `BusinessClock`), `require/can`, `audit()` and `emit()`. Seed, tests and the future simulator use `SYSTEM_ACTOR`, which bypasses permission checks. They can pass `businessDate` to act on another day.
+- **Events.** `ctx.emit()` writes a `DomainEvent` row, then runs the handlers registered with `on(type, handler)` **synchronously inside the same transaction**, so a throwing handler rolls back the whole command. Event types are declared by module augmentation of `DomainEventMap`. No handlers exist yet (accounting posts directly, D-023). The first cross-module handler (Phase 3) needs a single registration module that both the Next.js app and CLI scripts import, otherwise `on()` never runs.
+- **Accounting posting** (`modules/accounting`). Pure builders in `domain/entry.ts` (`buildInvoiceEntry`, `buildPaymentEntry`, `buildReversal`, `buildOpeningEntry`) produce drafts whose lines use mapping keys (`{ key: "REVENUE_LABOUR" }`) or codes. `postEntry(ctx, draft)` resolves keys via `AccountMapping` (site+brand → site → brand → global), validates (`validateEntry`), checks the period and numbers per journal (`VE-2026-000001`). Postgres triggers re-check balance (deferred, at commit), locked periods and immutability, so raw SQL cannot bypass them. Other modules invoice through `createAndIssueInvoice(ctx, input, { trusted: true })` and record money through `recordPayment`; lines name a `revenueKey` + `departmentCode`. Default chart/journals/mappings live in `domain/default-chart.ts` (`installDefaultChart`).
+- **Timelines** (`modules/core/queries/timeline.ts`) merge `DomainEvent` and `AuditLog` rows by `aggregateType/aggregateId` = `entityType/entityId`. Use the same entity name ("Customer", "Vehicle") in `emit` and `audit`.
+- **Numbering** (`modules/core/services/numbering.ts`) is raw SQL upsert-and-increment in the command's transaction (gap-free, rolled back with it). Series definitions live in `domain/numbering.ts`. Note: tables are `@@map`ped to snake_case but **columns keep Prisma's camelCase**, so raw SQL must quote them (`"nextValue"`).
+- **Menus and placeholders.** `src/components/shell/nav.ts` is the single menu definition. Items are shown only if the actor has `view` on their resource. Items with a `phase` render through the catch-all `src/app/(app)/[...placeholder]/page.tsx`. The e2e test derives the expected menu of every role from `DEFAULT_ROLE_MATRIX` + `NAV`, so changing either changes what the test expects.
+- **RBAC data** lives in `src/lib/rbac.ts` (resource catalogue, `can`) and `modules/admin/domain/role-matrix.ts` (default grants per role, seeded by `seedRolesAndPermissions`). Adding a resource means adding it to `RESOURCES` and to the matrix, then reseeding.
+- **Lists.** `DataTable` is a client component fed **serializable** cells (`CellValue`: link/badge/money/date/mono…) built in the server page. Sorting, filtering and paging are URL params parsed by `parseListParams` and whitelisted with `orderBy()`. CSV export reuses the same list query through `src/app/api/export/[entity]/route.ts`.
+- **Auth** (`src/auth.ts`). Two credentials providers: `credentials` (bcrypt) and `demo` (email only, active only when `DEMO_MODE=true`; powers the login shortcuts and the top-bar role switcher).
+- **Seed** (`prisma/seed/index.ts`, accounting part in `prisma/seed/accounting.ts`) creates reference data directly but all business objects through services. It is deterministic (`faker.seed(42)`), so do not reorder faker calls casually; append new generators at the end. It takes ~20 s (≈830 invoices, 1,600 entries; months before the last finished one are locked).
+- **Tests.** `tests/integration/helpers.ts` gives `resetWithMinimalOrg()` (truncate + 2 sites + roles), `resetWithAccounting()` (+ VAT rates and default chart), `sys()` (system command at a fixed business date, 2026-03-15) and `makeActor(role, siteId)`. Vitest runs files serially because they share `dms_test`.
 
 ## How to add a feature (pattern)
 
@@ -44,10 +72,10 @@ Demo users: every seeded user's password is `demo1234` (dev only). Emails: `admi
 
 ## Coding conventions
 
-- **Business logic lives only in `src/modules/<module>/services` and `domain`.** Never in React components, server actions or route handlers. Actions: parse with Zod → `runCommand(...)` → return `{ ok, data | error }`.
+- **Business logic lives only in `src/modules/<module>/services` and `domain`.** Never in React components, server actions or route handlers. Actions just turn `FormData` into an object and call `command()`. The **service** validates with `parseInput(schema, input)`, so CLI callers get the same validation and field errors flow back to `ActionForm`.
 - `domain/` = pure functions, no Prisma, no I/O, no `new Date()`. Every calculation there has a unit test.
 - Modules import each other only through `index.ts`. Cross-module side effects go through domain events (`ctx.emit`) or an explicit public service call. Accounting never imports sales/workshop/parts.
-- Every mutation: Zod-validated server-side, permission-checked (`runCommand(session, 'module.resource', action, fn)`), audited (`ctx.audit`), and run in `ctx.tx`.
+- Every mutation: Zod-validated in the service, permission-checked with `ctx.require("module.resource", action, siteId)` (site-scoped where the object has a site), audited (`ctx.audit`), and run in `ctx.tx`.
 - Money: `Int` cents, fields suffixed `Cents`. Never use floats for money; round only via `lib/money.ts`. Rates in basis points (`2000` = 20 %). Labour time in centi-hours. Parts qty and PMP as `Decimal`.
 - Dates: business dates from `ctx.businessDate` (the simulated clock). `new Date()` only for technical timestamps.
 - Nothing country-specific in code: VAT rates, accounts (via `AccountMapping` keys), number formats and legal mentions come from settings.

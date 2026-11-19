@@ -19,6 +19,7 @@ const eslintConfig = [
       "build/**",
       "next-env.d.ts",
       ".next-e2e/**",
+      ".next-preview/**",
       "test-results/**",
       "playwright-report/**",
       "src/components/ui/**",

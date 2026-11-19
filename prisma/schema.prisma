@@ -77,6 +77,10 @@ model Site {
   domainEvents     DomainEvent[]
   settings         Setting[]
   customers        Customer[]   @relation("CustomerHomeSite")
+  journalEntries   JournalEntry[]
+  invoices         Invoice[]
+  payments         Payment[]
+  accountMappings  AccountMapping[]
 
   @@map("site")
 }
@@ -87,10 +91,13 @@ model Brand {
   code          String      @unique
   name          String
   oemCustomerId String?     @unique // OEM as a customer (warranty receivables)
+  oemSupplierId String?     @unique // OEM as a supplier (vehicle & parts purchases)
   group         Group       @relation(fields: [groupId], references: [id])
   sites         SiteBrand[]
   vehicles      Vehicle[]
   oemCustomer   Customer?   @relation("BrandOemCustomer", fields: [oemCustomerId], references: [id])
+  oemSupplier   Supplier?   @relation("BrandOemSupplier", fields: [oemSupplierId], references: [id])
+  accountMappings AccountMapping[]
 
   @@map("brand")
 }
@@ -295,6 +302,8 @@ model Customer {
   contacts      Contact[]
   vehicles      Vehicle[]
   oemOfBrand    Brand?       @relation("BrandOemCustomer")
+  invoices      Invoice[]
+  payments      Payment[]
 
   @@index([displayName])
   @@map("customer")
@@ -487,4 +496,291 @@ model Setting {
 
   @@unique([key, siteId])
   @@map("setting")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Core: suppliers (payables party; purchasing documents arrive in Phase 4)
+// ─────────────────────────────────────────────────────────────
+
+model Supplier {
+  id               String    @id @default(cuid())
+  number           String    @unique // F00012
+  name             String
+  isOem            Boolean   @default(false)
+  siren            String?
+  vatNumber        String?
+  email            String?
+  phone            String?
+  address          String?
+  postalCode       String?
+  city             String?
+  countryCode      String    @default("FR")
+  paymentTermsDays Int       @default(30)
+  accountCode      String // auxiliary code, e.g. 401F00012
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  oemOfBrand       Brand?    @relation("BrandOemSupplier")
+  payments         Payment[]
+
+  @@map("supplier")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Accounting
+// ─────────────────────────────────────────────────────────────
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+/// Chart of accounts (PCG by default, configurable).
+model Account {
+  code             String         @id // e.g. "707100"
+  label            String
+  class            Int // first digit, 1..8
+  type             AccountType
+  postable         Boolean        @default(true)
+  requiresAnalytic Boolean        @default(false) // classes 6/7 need a department
+  isReceivable     Boolean        @default(false) // lines need a CUSTOMER party
+  isPayable        Boolean        @default(false) // lines need a SUPPLIER party
+  active           Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  lines            JournalLine[]
+  mappings         AccountMapping[]
+
+  @@map("account")
+}
+
+enum JournalKind {
+  SALES
+  PURCHASES
+  BANK
+  CASH
+  MISC
+  OPENING
+}
+
+model Journal {
+  code        String         @id // VE, AC, BQ, CA, OD, AN
+  label       String
+  kind        JournalKind
+  /// Treasury account for BANK/CASH journals (counterpart of payments).
+  accountCode String?
+  entries     JournalEntry[]
+  payments    Payment[]
+
+  @@map("journal")
+}
+
+enum PeriodStatus {
+  OPEN
+  LOCKED
+}
+
+model FiscalPeriod {
+  id         String         @id @default(cuid())
+  year       Int
+  month      Int
+  startDate  DateTime       @db.Date
+  endDate    DateTime       @db.Date
+  status     PeriodStatus   @default(OPEN)
+  lockedAt   DateTime?
+  lockedById String?
+  entries    JournalEntry[]
+
+  @@unique([year, month])
+  @@map("fiscal_period")
+}
+
+/// Posted entries are immutable; corrections are reversal entries.
+model JournalEntry {
+  id           String         @id @default(cuid())
+  number       String         @unique // VE-2026-000123, gap-free per journal & year
+  journalCode  String
+  periodId     String
+  siteId       String
+  entryDate    DateTime       @db.Date
+  label        String
+  sourceType   String? // INVOICE, PAYMENT, MANUAL, OPENING, REVERSAL…
+  sourceId     String?
+  reversalOfId String?        @unique
+  createdById  String?
+  createdAt    DateTime       @default(now())
+  journal      Journal        @relation(fields: [journalCode], references: [code])
+  period       FiscalPeriod   @relation(fields: [periodId], references: [id])
+  site         Site           @relation(fields: [siteId], references: [id])
+  reversalOf   JournalEntry?  @relation("EntryReversal", fields: [reversalOfId], references: [id])
+  reversedBy   JournalEntry?  @relation("EntryReversal")
+  lines        JournalLine[]
+
+  @@index([sourceType, sourceId])
+  @@index([entryDate])
+  @@map("journal_entry")
+}
+
+enum PartyType {
+  CUSTOMER
+  SUPPLIER
+}
+
+model JournalLine {
+  id             String          @id @default(cuid())
+  entryId        String
+  lineNo         Int
+  accountCode    String
+  departmentCode DepartmentCode?
+  partyType      PartyType?
+  partyId        String?
+  debitCents     Int             @default(0)
+  creditCents    Int             @default(0)
+  label          String
+  letteringCode  String?
+  // denormalised from the entry for fast reporting
+  siteId         String
+  entryDate      DateTime        @db.Date
+  entry          JournalEntry    @relation(fields: [entryId], references: [id], onDelete: Restrict)
+  account        Account         @relation(fields: [accountCode], references: [code])
+
+  @@unique([entryId, lineNo])
+  @@index([accountCode, entryDate])
+  @@index([partyType, partyId])
+  @@map("journal_line")
+}
+
+/// Posting key → account. Most specific wins: site + brand → site → brand → global.
+model AccountMapping {
+  id          String  @id @default(cuid())
+  key         String // e.g. REVENUE_VN, VAT_COLLECTED_STANDARD
+  siteId      String?
+  brandId     String?
+  accountCode String
+  site        Site?   @relation(fields: [siteId], references: [id])
+  brand       Brand?  @relation(fields: [brandId], references: [id])
+  account     Account @relation(fields: [accountCode], references: [code])
+
+  @@index([key])
+  @@map("account_mapping")
+}
+
+enum InvoiceKind {
+  INVOICE
+  CREDIT_NOTE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+}
+
+/// One table for every sales invoice and credit note (D-013). Numbered only at issue.
+model Invoice {
+  id                String         @id @default(cuid())
+  number            String?        @unique
+  kind              InvoiceKind    @default(INVOICE)
+  sourceType        String // MANUAL, SALES_ORDER, REPAIR_ORDER, COUNTER_SALE, WARRANTY_CLAIM
+  sourceId          String?
+  siteId            String
+  customerId        String
+  vatRegime         VatRegime      @default(STANDARD)
+  status            InvoiceStatus  @default(DRAFT)
+  issueDate         DateTime?      @db.Date
+  dueDate           DateTime?      @db.Date
+  totalExclVatCents Int            @default(0)
+  vatCents          Int            @default(0)
+  totalInclVatCents Int            @default(0)
+  paidCents         Int            @default(0)
+  creditedInvoiceId String?
+  journalEntryId    String?        @unique
+  notes             String?
+  createdById       String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  site              Site           @relation(fields: [siteId], references: [id])
+  customer          Customer       @relation(fields: [customerId], references: [id])
+  creditedInvoice   Invoice?       @relation("CreditNoteOf", fields: [creditedInvoiceId], references: [id])
+  creditNotes       Invoice[]      @relation("CreditNoteOf")
+  lines             InvoiceLine[]
+  allocations       PaymentAllocation[]
+
+  @@index([customerId, status])
+  @@index([sourceType, sourceId])
+  @@map("invoice")
+}
+
+model InvoiceLine {
+  id                    String         @id @default(cuid())
+  invoiceId             String
+  lineNo                Int
+  label                 String
+  quantity              Decimal        @db.Decimal(12, 3)
+  unitPriceExclVatCents Int
+  discountBp            Int            @default(0)
+  lineExclVatCents      Int
+  vatRateCode           String
+  vatRateBp             Int
+  vatCents              Int
+  departmentCode        DepartmentCode
+  revenueKey            String // AccountMapping key, e.g. REVENUE_LABOUR
+  invoice               Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@unique([invoiceId, lineNo])
+  @@map("invoice_line")
+}
+
+enum PaymentDirection {
+  IN
+  OUT
+}
+
+enum PaymentMethod {
+  TRANSFER
+  CARD
+  CHEQUE
+  CASH
+  FINANCE_COMPANY
+}
+
+model Payment {
+  id             String              @id @default(cuid())
+  number         String              @unique
+  siteId         String
+  direction      PaymentDirection
+  method         PaymentMethod
+  journalCode    String
+  customerId     String?
+  supplierId     String?
+  amountCents    Int
+  allocatedCents Int                 @default(0)
+  businessDate   DateTime            @db.Date
+  reference      String?
+  journalEntryId String?             @unique
+  createdById    String?
+  createdAt      DateTime            @default(now())
+  site           Site                @relation(fields: [siteId], references: [id])
+  journal        Journal             @relation(fields: [journalCode], references: [code])
+  customer       Customer?           @relation(fields: [customerId], references: [id])
+  supplier       Supplier?           @relation(fields: [supplierId], references: [id])
+  allocations    PaymentAllocation[]
+
+  @@index([customerId])
+  @@index([supplierId])
+  @@map("payment")
+}
+
+model PaymentAllocation {
+  id          String   @id @default(cuid())
+  paymentId   String
+  invoiceId   String
+  amountCents Int
+  createdAt   DateTime @default(now())
+  payment     Payment  @relation(fields: [paymentId], references: [id])
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id])
+
+  @@map("payment_allocation")
 }

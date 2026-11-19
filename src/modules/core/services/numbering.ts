@@ -1,5 +1,5 @@
 import type { ServiceContext } from "@/lib/context";
-import { DEFAULT_SEQUENCES, formatDocumentNumber } from "../domain/numbering";
+import { formatDocumentNumber, sequenceDefinition } from "../domain/numbering";
 
 /**
  * Take the next gap-free number in a series.
@@ -8,14 +8,15 @@ import { DEFAULT_SEQUENCES, formatDocumentNumber } from "../domain/numbering";
  *
  * @param scope site id, or "GROUP" for group-wide series
  * @param sitePrefix optional site code prepended to the series prefix (e.g. "NTE")
+ * @param date document date deciding the fiscal year (defaults to the business date)
  */
 export async function nextDocumentNumber(
   ctx: ServiceContext,
-  args: { docType: string; scope: string; sitePrefix?: string },
+  args: { docType: string; scope: string; sitePrefix?: string; date?: Date },
 ): Promise<string> {
-  const def = DEFAULT_SEQUENCES[args.docType];
+  const def = sequenceDefinition(args.docType);
   if (!def) throw new Error(`Unknown document type ${args.docType}`);
-  const fiscalYear = def.yearly ? ctx.businessDate.getUTCFullYear() : 0;
+  const fiscalYear = def.yearly ? (args.date ?? ctx.businessDate).getUTCFullYear() : 0;
   const prefix = args.sitePrefix ? `${args.sitePrefix}-${def.prefix}` : def.prefix;
 
   const rows = await ctx.tx.$queryRaw<{ value: number; prefix: string; padding: number }[]>`

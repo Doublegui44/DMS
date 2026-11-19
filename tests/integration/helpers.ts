@@ -44,3 +44,19 @@ export async function makeActor(role: RoleKey, siteId: string | null, email = `$
 }
 
 export { db };
+
+/** Minimal org + VAT rates + default chart, journals and mappings. */
+export async function resetWithAccounting() {
+  const org = await resetWithMinimalOrg();
+  const { installDefaultChart } = await import("@/modules/accounting");
+  await db.vatRate.createMany({
+    data: [
+      { countryCode: "FR", code: "STANDARD", label: "20 %", rateBp: 2000, validFrom: new Date("2014-01-01") },
+      { countryCode: "FR", code: "INTERMEDIATE", label: "10 %", rateBp: 1000, validFrom: new Date("2014-01-01") },
+      { countryCode: "FR", code: "REDUCED", label: "5.5 %", rateBp: 550, validFrom: new Date("2014-01-01") },
+      { countryCode: "FR", code: "ZERO", label: "0 %", rateBp: 0, validFrom: new Date("2014-01-01") },
+    ],
+  });
+  await sys((ctx) => installDefaultChart(ctx));
+  return org;
+}

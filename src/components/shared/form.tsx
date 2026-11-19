@@ -104,7 +104,8 @@ export function NativeSelect({
     <select
       id={name}
       name={name}
-      defaultValue={defaultValue ?? ""}
+      // Controlled when the caller passes `value`; React rejects both props at once.
+      {...(rest.value === undefined ? { defaultValue: defaultValue ?? "" } : {})}
       aria-invalid={invalid || undefined}
       className={inputClass}
       {...rest}

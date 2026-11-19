@@ -959,7 +959,7 @@ erDiagram
     string letteringCode
   }
   AccountMapping {
-    string key "VN_REVENUE, VAT_COLLECTED_STD…"
+    string key "REVENUE_VN, VAT_COLLECTED_STANDARD…"
     string siteId FK "nullable"
     string brandId FK "nullable"
     string accountCode FK
@@ -1013,15 +1013,15 @@ erDiagram
 ## 7. Accounting engine
 
 ### 7.1 Posting service
-`accounting.post(ctx, { journal, date, label, source, lines[] })`:
-1. Resolve each line's `mappingKey` to an account through `AccountMapping` (most specific wins: site + brand → site → global).
-2. Reject if any line has both debit and credit, or a negative amount.
-3. Reject if Σ debit ≠ Σ credit (**`UnbalancedEntryError`**), or fewer than 2 lines.
-4. Reject if an account is not postable, or is class 6/7 without a department (**`AnalyticRequiredError`**).
-5. Find the `FiscalPeriod` for `date`; reject if `LOCKED` (**`PeriodLockedError`**). This check is also enforced by a Postgres trigger on `JournalLine`/`JournalEntry` insert, so nothing can bypass it.
-6. Take the next gap-free entry number for the journal and write the entry.
+Builders in `modules/accounting/domain/entry.ts` turn documents into an `EntryDraft` whose lines reference either a mapping key (`{ key: "REVENUE_LABOUR" }`) or an account code. `postEntry(ctx, draft, { brandId? })` then:
+1. Resolves each key through `AccountMapping` (most specific wins: site + brand → site → brand → global); a missing key raises `mapping_missing`.
+2. Validates with `validateEntry` and reports every problem at once: fewer than 2 lines, a line both debit and credit or negative, unknown / non-postable account, class 6/7 without a department, receivable/payable account without the right party, Σ debit ≠ Σ credit.
+3. Finds or creates the `FiscalPeriod` for the entry date; rejects if `LOCKED`.
+4. Takes the next gap-free number of the journal series (`OD-2026-000042`) and writes the entry and its lines in the command's transaction.
 
-Entries are immutable. Corrections are reversal entries (`reversalOfId`).
+Postgres repeats the essential checks (D-020): a deferred trigger rejects unbalanced entries at commit, row triggers reject inserts into locked periods and any update except lettering.
+
+Entries are immutable. Manual and opening entries are corrected by `reverseEntry` (mirrored entry, `reversalOfId`); invoices by credit notes.
 
 ### 7.2 Posting rules (default PCG mapping, all configurable)
 
@@ -1057,7 +1057,7 @@ Exact accounts are seed data in `AccountMapping`; the table above is the default
 - VAT report per period: collected by rate, deductible on goods / services, margin-regime base, net due.
 
 ### 7.4 Period close
-Monthly `FiscalPeriod`s. Closing checklist (reports run, no draft invoices dated in the period, trial balance balances) → lock. Locked periods reject postings at service and database level. Only `Admin` can reopen (audited).
+Monthly `FiscalPeriod`s. Checklist (`closeChecklist`): period open, earlier periods with entries locked, business date past month end, period trial balance balanced (blocking); draft invoices (warning). Lock → locked periods reject postings at service and database level. Only `Admin` (`accounting.period:delete`) can reopen, latest locked period first, with an audited reason.
 
 ### 7.5 Reports and exports
 Trial balance, general ledger, customer/supplier ledgers with ageing (0–30/31–60/61–90/>90), P&L by department, gross margin by department, stock value (VN/VO/Parts, reconciled to 37x), VAT report, FEC export (the 18 standard columns, `|` separated).
@@ -1088,7 +1088,7 @@ Trial balance, general ledger, customer/supplier ledgers with ageing (0–30/31�
 | accounting | `PeriodLocked` | — |
 | clock | `BusinessDayAdvanced` | sales (reservation expiry, ageing), accounting (overdue), parts (reorder suggestions) |
 
-`Invoice` lives in the accounting module (it owns receivables) but is created through `accounting.issueInvoice()` called by sales/workshop/parts services; the resulting `InvoiceIssued` event triggers posting.
+`Invoice` lives in the accounting module (it owns receivables) and is created through `createAndIssueInvoice()` called by sales/workshop/parts services. Issuing posts the sales entry directly in the same transaction (D-023) and then emits `InvoiceIssued` for other modules. Accounting also emits `JournalEntryPosted`, `PaymentRecorded`, `PeriodLocked` and `PeriodReopened`.
 
 ## 10. UI shell and navigation
 

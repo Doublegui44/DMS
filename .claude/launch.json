@@ -1,6 +1,23 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "dms-dev", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 3000 }
+    {
+      "name": "dms-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "dms-e2e-preview",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "set -a; . ./.env.e2e; set +a; NEXT_DIST_DIR=.next-preview exec npx next dev -p ${PORT:-3200}"
+      ],
+      "port": 3200
+    }
   ]
 }

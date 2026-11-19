@@ -56,10 +56,13 @@ export const NAV: NavGroup[] = [
   {
     key: "accounting",
     items: [
-      { key: "entries", href: "/accounting/entries", resource: "accounting.entry", icon: "BookText", phase: 2 },
-      { key: "invoices", href: "/accounting/invoices", resource: "accounting.invoice", icon: "Receipt", phase: 2 },
-      { key: "payments", href: "/accounting/payments", resource: "accounting.payment", icon: "Banknote", phase: 2 },
-      { key: "periods", href: "/accounting/periods", resource: "accounting.period", icon: "Lock", phase: 2 },
+      { key: "invoices", href: "/accounting/invoices", resource: "accounting.invoice", icon: "Receipt" },
+      { key: "payments", href: "/accounting/payments", resource: "accounting.payment", icon: "Banknote" },
+      { key: "entries", href: "/accounting/entries", resource: "accounting.entry", icon: "BookText" },
+      { key: "ledgers", href: "/accounting/ledgers", resource: "accounting.report", icon: "BookUser" },
+      { key: "trialBalance", href: "/accounting/trial-balance", resource: "accounting.report", icon: "Scale" },
+      { key: "chart", href: "/accounting/chart", resource: "accounting.chart", icon: "ListTree" },
+      { key: "periods", href: "/accounting/periods", resource: "accounting.period", icon: "Lock" },
       { key: "reports", href: "/accounting/reports", resource: "accounting.report", icon: "BarChart3", phase: 6 },
     ],
   },

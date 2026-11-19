@@ -4,6 +4,9 @@ import { Pencil } from "lucide-react";
 import { getRequestContext, query } from "@/lib/session";
 import { can } from "@/lib/rbac";
 import { getCustomer, getTimeline } from "@/modules/core";
+import { getCustomerAccount } from "@/modules/accounting";
+import { formatMoney } from "@/lib/money";
+import { formatDate } from "@/lib/dates";
 import { Fields, PageHeader, Section } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Timeline } from "@/components/shared/timeline";
@@ -14,9 +17,10 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const { id } = await params;
   const t = await getTranslations();
   const { actor } = await getRequestContext();
-  const [c, timeline] = await Promise.all([
+  const [c, timeline, account] = await Promise.all([
     query((ctx) => getCustomer(ctx, id)),
     query((ctx) => getTimeline(ctx, "Customer", id)),
+    query((ctx) => getCustomerAccount(ctx, id)),
   ]);
   const canEdit = can(actor.permissions, "customer", "edit");
   const yes = t("common.yes");
@@ -106,9 +110,49 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             )}
           </Section>
         </div>
-        <Section title={t("common.timeline")}>
-          <Timeline items={timeline} />
-        </Section>
+        <div className="space-y-4">
+          {account && (
+            <Section
+              title={t("accounting.accountSummary")}
+              actions={
+                <Link href={`/accounting/ledgers/customer/${c.id}`} className="text-xs text-primary hover:underline">
+                  {t("accounting.statement")} →
+                </Link>
+              }
+            >
+              <dl className="mb-3 grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <dt className="text-xs text-muted-foreground">{t("accounting.receivable")}</dt>
+                  <dd className="font-semibold tabular-nums" data-testid="customer-balance">{formatMoney(account.balanceCents)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">{t("accounting.overdueAmount")}</dt>
+                  <dd className={`font-semibold tabular-nums ${account.overdueCents > 0 ? "text-destructive" : ""}`}>{formatMoney(account.overdueCents)}</dd>
+                </div>
+              </dl>
+              <h3 className="mb-1 text-xs font-medium text-muted-foreground">{t("accounting.recentInvoices")}</h3>
+              {account.recent.length === 0 ? (
+                <p className="text-sm text-muted-foreground">{t("common.noResults")}</p>
+              ) : (
+                <ul className="divide-y text-[13px]">
+                  {account.recent.map((i) => (
+                    <li key={i.id} className="flex items-center justify-between gap-2 py-1">
+                      <Link href={`/accounting/invoices/${i.id}`} className="font-mono text-xs text-primary hover:underline">
+                        {i.number}
+                      </Link>
+                      <span className="text-xs text-muted-foreground">{formatDate(i.issueDate)}</span>
+                      <StatusBadge status={i.status} label={t(`accounting.statuses.${i.status}`)} />
+                      <span className="tabular-nums">{formatMoney(i.kind === "CREDIT_NOTE" ? -i.totalInclVatCents : i.totalInclVatCents)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Section>
+          )}
+          <Section title={t("common.timeline")}>
+            <Timeline items={timeline} />
+          </Section>
+        </div>
       </div>
     </div>
   );

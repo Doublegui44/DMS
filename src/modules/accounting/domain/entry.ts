@@ -1,0 +1,293 @@
+/**
+ * Journal entry drafts, validation and builders (pure).
+ * Builders turn business documents into balanced drafts; the posting service resolves
+ * mapping keys to accounts, validates and writes them.
+ */
+import { sumCents, type Cents } from "@/lib/money";
+
+export type DepartmentCode = "VN" | "VO" | "WORKSHOP" | "PARTS" | "ACCOUNTING" | "OVERHEAD";
+export type PartyType = "CUSTOMER" | "SUPPLIER";
+
+/** Either a mapping key (resolved through AccountMapping) or an explicit account code. */
+export type AccountRef = { key: string } | { code: string };
+
+export interface DraftLine {
+  account: AccountRef;
+  debitCents: Cents;
+  creditCents: Cents;
+  label: string;
+  departmentCode?: DepartmentCode | null;
+  partyType?: PartyType | null;
+  partyId?: string | null;
+}
+
+export interface EntryDraft {
+  journalCode: string;
+  siteId: string;
+  entryDate: Date;
+  label: string;
+  sourceType: string;
+  sourceId?: string | null;
+  lines: DraftLine[];
+}
+
+export interface ResolvedLine extends Omit<DraftLine, "account"> {
+  accountCode: string;
+}
+
+export interface AccountInfo {
+  code: string;
+  postable: boolean;
+  active: boolean;
+  requiresAnalytic: boolean;
+  isReceivable: boolean;
+  isPayable: boolean;
+}
+
+export type EntryError =
+  | { code: "TOO_FEW_LINES" }
+  | { code: "UNBALANCED"; debitCents: Cents; creditCents: Cents }
+  | { code: "EMPTY_ENTRY" }
+  | { code: "INVALID_AMOUNT"; line: number }
+  | { code: "UNKNOWN_ACCOUNT"; line: number; accountCode: string }
+  | { code: "NOT_POSTABLE"; line: number; accountCode: string }
+  | { code: "ANALYTIC_REQUIRED"; line: number; accountCode: string }
+  | { code: "PARTY_REQUIRED"; line: number; accountCode: string; partyType: PartyType };
+
+/** Validate a resolved entry. Returns every problem found (empty array = valid). */
+export function validateEntry(lines: ResolvedLine[], accounts: Map<string, AccountInfo>): EntryError[] {
+  const errors: EntryError[] = [];
+  if (lines.length < 2) errors.push({ code: "TOO_FEW_LINES" });
+  lines.forEach((l, i) => {
+    const n = i + 1;
+    const oneSided = (l.debitCents === 0) !== (l.creditCents === 0);
+    if (!Number.isSafeInteger(l.debitCents) || !Number.isSafeInteger(l.creditCents) || l.debitCents < 0 || l.creditCents < 0 || !oneSided) {
+      errors.push({ code: "INVALID_AMOUNT", line: n });
+    }
+    const a = accounts.get(l.accountCode);
+    if (!a) {
+      errors.push({ code: "UNKNOWN_ACCOUNT", line: n, accountCode: l.accountCode });
+      return;
+    }
+    if (!a.postable || !a.active) errors.push({ code: "NOT_POSTABLE", line: n, accountCode: a.code });
+    if (a.requiresAnalytic && !l.departmentCode) errors.push({ code: "ANALYTIC_REQUIRED", line: n, accountCode: a.code });
+    if (a.isReceivable && (l.partyType !== "CUSTOMER" || !l.partyId)) {
+      errors.push({ code: "PARTY_REQUIRED", line: n, accountCode: a.code, partyType: "CUSTOMER" });
+    }
+    if (a.isPayable && (l.partyType !== "SUPPLIER" || !l.partyId)) {
+      errors.push({ code: "PARTY_REQUIRED", line: n, accountCode: a.code, partyType: "SUPPLIER" });
+    }
+  });
+  const debitCents = sumCents(lines.map((l) => (Number.isSafeInteger(l.debitCents) ? l.debitCents : 0)));
+  const creditCents = sumCents(lines.map((l) => (Number.isSafeInteger(l.creditCents) ? l.creditCents : 0)));
+  if (debitCents !== creditCents) errors.push({ code: "UNBALANCED", debitCents, creditCents });
+  if (lines.length >= 2 && debitCents === 0) errors.push({ code: "EMPTY_ENTRY" });
+  return errors;
+}
+
+export function describeEntryError(e: EntryError): string {
+  switch (e.code) {
+    case "TOO_FEW_LINES":
+      return "An entry needs at least two lines";
+    case "UNBALANCED":
+      return `Entry does not balance: debit ${(e.debitCents / 100).toFixed(2)} ≠ credit ${(e.creditCents / 100).toFixed(2)}`;
+    case "EMPTY_ENTRY":
+      return "Entry amounts are zero";
+    case "INVALID_AMOUNT":
+      return `Line ${e.line}: enter either a debit or a credit, positive`;
+    case "UNKNOWN_ACCOUNT":
+      return `Line ${e.line}: unknown account ${e.accountCode}`;
+    case "NOT_POSTABLE":
+      return `Line ${e.line}: account ${e.accountCode} cannot be posted to`;
+    case "ANALYTIC_REQUIRED":
+      return `Line ${e.line}: account ${e.accountCode} needs a department`;
+    case "PARTY_REQUIRED":
+      return `Line ${e.line}: account ${e.accountCode} needs a ${e.partyType.toLowerCase()}`;
+  }
+}
+
+/** Swap debit and credit on every line (used for credit notes and reversals). */
+export function mirrorLines<T extends { debitCents: Cents; creditCents: Cents }>(lines: T[]): T[] {
+  return lines.map((l) => ({ ...l, debitCents: l.creditCents, creditCents: l.debitCents }));
+}
+
+function signed(amount: Cents): { debitCents: Cents; creditCents: Cents } {
+  return amount >= 0 ? { debitCents: amount, creditCents: 0 } : { debitCents: 0, creditCents: -amount };
+}
+
+/** Drop zero lines; merge lines with identical account/department/party/label. */
+export function compactLines(lines: DraftLine[]): DraftLine[] {
+  const map = new Map<string, DraftLine & { net: number }>();
+  for (const l of lines) {
+    const ref = "key" in l.account ? `k:${l.account.key}` : `c:${l.account.code}`;
+    const k = [ref, l.departmentCode ?? "", l.partyType ?? "", l.partyId ?? "", l.label].join("|");
+    const net = l.debitCents - l.creditCents;
+    const prev = map.get(k);
+    if (prev) prev.net += net;
+    else map.set(k, { ...l, net });
+  }
+  return [...map.values()]
+    .filter((l) => l.net !== 0)
+    .map(({ net, ...l }) => ({ ...l, ...signed(net) }));
+}
+
+// ── Builders ────────────────────────────────────────────────
+
+export interface InvoiceForPosting {
+  id: string;
+  number: string;
+  kind: "INVOICE" | "CREDIT_NOTE";
+  siteId: string;
+  issueDate: Date;
+  customerId: string;
+  customerName: string;
+  /** RECEIVABLE_CUSTOMER or RECEIVABLE_OEM */
+  receivableKey: string;
+  vatRegime: "STANDARD" | "MARGIN";
+  totalInclVatCents: Cents;
+  lines: { label: string; lineExclVatCents: Cents; vatCents: Cents; vatRateCode: string; departmentCode: DepartmentCode; revenueKey: string }[];
+}
+
+/**
+ * Sales invoice: Dr receivable (incl. VAT) / Cr revenue per line (excl. VAT, with department) / Cr VAT collected per rate.
+ * Credit note: same entry mirrored.
+ */
+export function buildInvoiceEntry(inv: InvoiceForPosting, journalCode = "VE"): EntryDraft {
+  const label = `${inv.kind === "CREDIT_NOTE" ? "Credit note" : "Invoice"} ${inv.number} ${inv.customerName}`.slice(0, 120);
+  const lines: DraftLine[] = [
+    {
+      account: { key: inv.receivableKey },
+      debitCents: inv.totalInclVatCents,
+      creditCents: 0,
+      label,
+      partyType: "CUSTOMER",
+      partyId: inv.customerId,
+    },
+  ];
+  for (const l of inv.lines) {
+    lines.push({ account: { key: l.revenueKey }, debitCents: 0, creditCents: l.lineExclVatCents, label, departmentCode: l.departmentCode });
+    if (l.vatCents !== 0) {
+      const vatKey = inv.vatRegime === "MARGIN" ? "VAT_COLLECTED_MARGIN" : `VAT_COLLECTED_${l.vatRateCode}`;
+      lines.push({ account: { key: vatKey }, debitCents: 0, creditCents: l.vatCents, label });
+    }
+  }
+  // Negative lines (e.g. discounts) end up on the right side after compaction.
+  let compacted = compactLines(lines);
+  if (inv.kind === "CREDIT_NOTE") compacted = mirrorLines(compacted);
+  return {
+    journalCode,
+    siteId: inv.siteId,
+    entryDate: inv.issueDate,
+    label,
+    sourceType: "INVOICE",
+    sourceId: inv.id,
+    lines: compacted,
+  };
+}
+
+export interface PaymentForPosting {
+  id: string;
+  number: string;
+  siteId: string;
+  date: Date;
+  direction: "IN" | "OUT";
+  journalCode: string;
+  treasury: AccountRef; // bank / cash / finance-company account
+  party: { type: PartyType; id: string; name: string; accountKey: string };
+  amountCents: Cents;
+}
+
+/** Customer receipt: Dr treasury / Cr receivable. Supplier payment: Dr payable / Cr treasury. */
+export function buildPaymentEntry(p: PaymentForPosting): EntryDraft {
+  if (p.amountCents <= 0) throw new RangeError("Payment amount must be positive");
+  const label = `${p.direction === "IN" ? "Receipt" : "Payment"} ${p.number} ${p.party.name}`.slice(0, 120);
+  const treasuryLine: DraftLine = { account: p.treasury, debitCents: 0, creditCents: 0, label };
+  const partyLine: DraftLine = {
+    account: { key: p.party.accountKey },
+    debitCents: 0,
+    creditCents: 0,
+    label,
+    partyType: p.party.type,
+    partyId: p.party.id,
+  };
+  if (p.direction === "IN") {
+    treasuryLine.debitCents = p.amountCents;
+    partyLine.creditCents = p.amountCents;
+  } else {
+    partyLine.debitCents = p.amountCents;
+    treasuryLine.creditCents = p.amountCents;
+  }
+  return {
+    journalCode: p.journalCode,
+    siteId: p.siteId,
+    entryDate: p.date,
+    label,
+    sourceType: "PAYMENT",
+    sourceId: p.id,
+    lines: p.direction === "IN" ? [treasuryLine, partyLine] : [partyLine, treasuryLine],
+  };
+}
+
+/** Reversal of a posted entry: same lines, sides swapped, new date. */
+export function buildReversal(
+  original: { id: string; number: string; journalCode: string; siteId: string; lines: ResolvedLine[] },
+  date: Date,
+  reason: string,
+): EntryDraft {
+  const label = `Reversal of ${original.number}${reason ? ` — ${reason}` : ""}`.slice(0, 120);
+  return {
+    journalCode: original.journalCode,
+    siteId: original.siteId,
+    entryDate: date,
+    label,
+    sourceType: "REVERSAL",
+    sourceId: original.id,
+    lines: mirrorLines(original.lines).map((l) => ({
+      account: { code: l.accountCode },
+      debitCents: l.debitCents,
+      creditCents: l.creditCents,
+      label,
+      departmentCode: l.departmentCode,
+      partyType: l.partyType,
+      partyId: l.partyId,
+    })),
+  };
+}
+
+/** Opening balances: one line per balance; the difference goes to the balancing account. */
+export function buildOpeningEntry(args: {
+  siteId: string;
+  date: Date;
+  balances: { account: AccountRef; amountCents: Cents; label: string; partyType?: PartyType; partyId?: string }[];
+  balancingAccount: AccountRef;
+}): EntryDraft {
+  const lines: DraftLine[] = args.balances
+    .filter((b) => b.amountCents !== 0)
+    .map((b) => ({ account: b.account, ...signed(b.amountCents), label: b.label, partyType: b.partyType, partyId: b.partyId }));
+  const net = sumCents(lines.map((l) => l.debitCents - l.creditCents));
+  if (net !== 0) lines.push({ account: args.balancingAccount, ...signed(-net), label: "Opening balance" });
+  return { journalCode: "AN", siteId: args.siteId, entryDate: args.date, label: "Opening balances", sourceType: "OPENING", lines };
+}
+
+/** Lines can be lettered (matched) together only if they net to zero. */
+export function canLetter(lines: { debitCents: Cents; creditCents: Cents }[]): boolean {
+  return lines.length >= 2 && sumCents(lines.map((l) => l.debitCents - l.creditCents)) === 0;
+}
+
+/** Lettering codes: A..Z, AA..ZZ, AAA… (spreadsheet-style). */
+export function letteringCode(index: number): string {
+  let n = index;
+  let s = "";
+  do {
+    s = String.fromCharCode(65 + (n % 26)) + s;
+    n = Math.floor(n / 26) - 1;
+  } while (n >= 0);
+  return s;
+}
+
+/** Inverse of `letteringCode` (A → 0, AA → 26). */
+export function letteringIndex(code: string): number {
+  let n = 0;
+  for (const ch of code) n = n * 26 + (ch.charCodeAt(0) - 64);
+  return n - 1;
+}

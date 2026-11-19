@@ -1,5 +1,5 @@
 /**
- * Seed v1 — organisation, roles, users, customers, vehicles.
+ * Seed — organisation, roles, users, customers, vehicles (v1), accounting (Phase 2).
  * Everything business-related goes through the service layer (runCommand + services),
  * so the same rules, numbering, audit and events apply as in the UI.
  *
@@ -21,6 +21,7 @@ import {
   type VehicleInput,
 } from "@/modules/core";
 import { createUser, seedRolesAndPermissions, type RoleKey } from "@/modules/admin";
+import { seedAccounting } from "./accounting";
 import { APPROVAL_RULES, BRANDS, COLOURS, SETTINGS, SITES, VN_MODELS, VO_MODELS } from "./data";
 
 export const DEMO_PASSWORD = "demo1234";
@@ -420,11 +421,13 @@ export async function seed() {
   await seedUsers(sites);
   const customerIds = await seedCustomers(sites, brands);
   const vehicles = await seedVehicles(today, sites, brands, customerIds);
+  const accounting = await seedAccounting(today, sites, brands, customerIds);
   const counts = {
     sites: sites.size,
     users: await db.user.count(),
     customers: await db.customer.count(),
     ...vehicles,
+    ...accounting,
     seconds: Math.round((Date.now() - started) / 1000),
   };
   console.log("Seed complete", counts);
