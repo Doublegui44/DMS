@@ -26,6 +26,9 @@ export const DEFAULT_SEQUENCES: Record<string, SequenceDefinition> = {
   LEAD: { prefix: "LD", padding: 5, yearly: true },
   FACTORY_ORDER: { prefix: "CU", padding: 5, yearly: true },
   VO_PURCHASE: { prefix: "RA", padding: 5, yearly: true },
+  SUPPLIER_INVOICE: { prefix: "FR", padding: 5, yearly: true },
+  STOCK_TRANSFER: { prefix: "TS", padding: 5, yearly: true },
+  CYCLE_COUNT: { prefix: "IV", padding: 5, yearly: true },
 };
 
 /** Journal entry series: one gap-free counter per journal and fiscal year (e.g. VE-2026-000001). */

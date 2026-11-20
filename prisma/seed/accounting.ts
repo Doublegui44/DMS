@@ -39,12 +39,32 @@ const WORKSHOP_JOBS = [
 
 /** Other modules' history, run inside the accounting one so document numbers stay chronological. */
 export interface HistoryHooks {
+  /** Before the opening balances (stock that the opening entry must value). */
+  opening?: (opening: Date) => Promise<void>;
   /** After the opening balances, before the first day. */
   before?: (opening: Date) => Promise<void>;
   /** At the end of each day of history. */
   day?: (day: Date) => Promise<void>;
   /** After the last day, before the months are locked. */
   after?: () => Promise<void>;
+}
+
+/** Run several modules' hooks in order at each point of the history. */
+export function composeHooks(...all: HistoryHooks[]): HistoryHooks {
+  return {
+    opening: async (d) => {
+      for (const h of all) await h.opening?.(d);
+    },
+    before: async (d) => {
+      for (const h of all) await h.before?.(d);
+    },
+    day: async (d) => {
+      for (const h of all) await h.day?.(d);
+    },
+    after: async () => {
+      for (const h of all) await h.after?.();
+    },
+  };
 }
 
 export async function seedAccounting(
@@ -68,6 +88,8 @@ export async function seedAccounting(
     await sys((ctx) => createSupplier(ctx, { name, paymentTermsDays: 30, city: faker.location.city() }));
   }
 
+  await hooks.opening?.(opening);
+
   // Opening balances per site: stock sub-ledgers (perpetual inventory), bank, capital. Only the cars
   // held when the books are opened: later arrivals are booked on their stock-in date (sales seed).
   const stock = await db.vehicle.groupBy({
@@ -79,6 +101,7 @@ export async function seedAccounting(
     },
     _sum: { stockValueCents: true },
   });
+  const parts = await db.stockItem.groupBy({ by: ["siteId"], _sum: { valueCents: true } });
   for (const s of SITES) {
     const siteId = sites.get(s.code)!;
     const v = (t: "VN" | "VO") => stock.find((x) => x.siteId === siteId && x.stockType === t)?._sum.stockValueCents ?? 0;
@@ -89,6 +112,7 @@ export async function seedAccounting(
         balances: [
           { account: { key: "STOCK_VN" }, amountCents: v("VN"), label: "VN stock at opening" },
           { account: { key: "STOCK_VO" }, amountCents: v("VO"), label: "VO stock at opening" },
+          { account: { key: "STOCK_PARTS" }, amountCents: parts.find((x) => x.siteId === siteId)?._sum.valueCents ?? 0, label: "Parts stock at opening" },
           { account: { code: "512100" }, amountCents: 35_000_000, label: "Bank at opening" },
           { account: { key: "CAPITAL" }, amountCents: -30_000_000, label: "Share capital" },
         ],

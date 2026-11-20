@@ -1,5 +1,5 @@
 /**
- * Seed — organisation, roles, users, customers, vehicles (v1), accounting (Phase 2), sales (Phase 3).
+ * Seed — organisation, roles, users, customers, vehicles (v1), accounting (Phase 2), sales (Phase 3), parts (Phase 4).
  * Everything business-related goes through the service layer (runCommand + services),
  * so the same rules, numbering, audit and events apply as in the UI.
  *
@@ -22,7 +22,8 @@ import {
   type VehicleInput,
 } from "@/modules/core";
 import { createUser, seedRolesAndPermissions, type RoleKey } from "@/modules/admin";
-import { seedAccounting } from "./accounting";
+import { composeHooks, seedAccounting } from "./accounting";
+import { partsSeeder } from "./parts";
 import { salesSeeder } from "./sales";
 import { APPROVAL_RULES, BRANDS, COLOURS, SETTINGS, SITE_SETTINGS, SITES, VN_MODELS, VO_MODELS } from "./data";
 
@@ -429,7 +430,8 @@ export async function seed() {
   const customerIds = await seedCustomers(sites, brands);
   const vehicles = await seedVehicles(today, sites, brands, customerIds);
   const sales = salesSeeder({ today, sites, brands });
-  const accounting = await seedAccounting(today, sites, brands, customerIds, sales.hooks);
+  const parts = partsSeeder({ today, sites, brands });
+  const accounting = await seedAccounting(today, sites, brands, customerIds, composeHooks(sales.hooks, parts.hooks));
   const counts = {
     sites: sites.size,
     users: await db.user.count(),
@@ -437,6 +439,7 @@ export async function seed() {
     ...vehicles,
     ...accounting,
     sales: sales.stats,
+    parts: parts.stats,
     seconds: Math.round((Date.now() - started) / 1000),
   };
   console.log("Seed complete", counts);

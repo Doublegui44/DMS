@@ -4,8 +4,10 @@ import { computeLine, computeMarginLine, dueDate, invoiceTotals, marginVat } fro
 import {
   buildInvoiceEntry,
   buildOpeningEntry,
+  buildPartsStockEntry,
   buildPaymentEntry,
   buildReversal,
+  buildSupplierInvoiceEntry,
   canLetter,
   compactLines,
   letteringCode,
@@ -230,6 +232,66 @@ describe("entry builders always balance", () => {
     });
     expectBalanced(e);
     expect(e.lines.at(-1)).toMatchObject({ creditCents: 750_000 });
+  });
+});
+
+describe("parts postings", () => {
+  const base = { siteId: "s1", date: new Date("2026-03-15"), label: "NTE-BR-2026-00001", sourceType: "GOODS_RECEIPT", sourceId: "r1" };
+
+  it("a receipt puts value into parts stock against stock variation", () => {
+    const e = buildPartsStockEntry({ ...base, valueCents: 12_345, counterpart: "VARIATION" });
+    expectBalanced(e);
+    expect(e.journalCode).toBe("OD");
+    expect(e.lines[0]).toMatchObject({ account: { key: "STOCK_PARTS" }, debitCents: 12_345 });
+    expect(e.lines[1]).toMatchObject({ account: { key: "STOCK_VARIATION_PARTS" }, creditCents: 12_345, departmentCode: "PARTS" });
+  });
+
+  it("an issue takes value out; a transfer goes through the liaison account", () => {
+    const out = buildPartsStockEntry({ ...base, valueCents: -500, counterpart: "VARIATION" });
+    expectBalanced(out);
+    expect(out.lines[1]).toMatchObject({ account: { key: "STOCK_PARTS" }, creditCents: 500 });
+    expect(out.lines[0]).toMatchObject({ account: { key: "STOCK_VARIATION_PARTS" }, debitCents: 500, departmentCode: "PARTS" });
+    const t = buildPartsStockEntry({ ...base, valueCents: -500, counterpart: "LIAISON" });
+    expect(t.lines[0]).toMatchObject({ account: { key: "SITE_LIAISON" }, debitCents: 500 });
+    expect(t.lines[0].departmentCode).toBeUndefined();
+  });
+
+  it("refuses zero or fractional amounts", () => {
+    expect(() => buildPartsStockEntry({ ...base, valueCents: 0, counterpart: "VARIATION" })).toThrow(RangeError);
+    expect(() => buildPartsStockEntry({ ...base, valueCents: 1.5, counterpart: "VARIATION" })).toThrow(RangeError);
+  });
+
+  const invoice = {
+    ...base,
+    sourceType: "SUPPLIER_INVOICE",
+    supplierId: "sup1",
+    payable: { key: "PAYABLE_OEM" },
+    purchaseAccount: { key: "PURCHASE_PARTS" },
+    departmentCode: "PARTS" as const,
+  };
+
+  it("a supplier invoice clears goods received not invoiced and books the price variance", () => {
+    const e = buildSupplierInvoiceEntry({ ...invoice, receiptValueCents: 10_000, varianceCents: 150, vatCents: 2_030 });
+    expectBalanced(e);
+    expect(e.journalCode).toBe("AC");
+    expect(e.lines).toHaveLength(4);
+    expect(e.lines[0]).toMatchObject({ account: { key: "GOODS_RECEIVED_NOT_INVOICED" }, debitCents: 10_000, partyType: "SUPPLIER", partyId: "sup1" });
+    expect(e.lines[1]).toMatchObject({ account: { key: "PURCHASE_PARTS" }, debitCents: 150, departmentCode: "PARTS" });
+    expect(e.lines[2]).toMatchObject({ account: { key: "VAT_DEDUCTIBLE_GOODS" }, debitCents: 2_030 });
+    expect(e.lines[3]).toMatchObject({ account: { key: "PAYABLE_OEM" }, creditCents: 12_180, partyType: "SUPPLIER", partyId: "sup1" });
+  });
+
+  it("a cheaper invoice credits purchases; an exact match has no variance line", () => {
+    const cheaper = buildSupplierInvoiceEntry({ ...invoice, receiptValueCents: 10_000, varianceCents: -200, vatCents: 1_960 });
+    expectBalanced(cheaper);
+    expect(cheaper.lines[1]).toMatchObject({ account: { key: "PURCHASE_PARTS" }, creditCents: 200 });
+    const exact = buildSupplierInvoiceEntry({ ...invoice, receiptValueCents: 10_000, varianceCents: 0, vatCents: 2_000 });
+    expectBalanced(exact);
+    expect(exact.lines.map((l) => ("key" in l.account ? l.account.key : l.account.code))).toEqual([
+      "GOODS_RECEIVED_NOT_INVOICED",
+      "VAT_DEDUCTIBLE_GOODS",
+      "PAYABLE_OEM",
+    ]);
   });
 });
 

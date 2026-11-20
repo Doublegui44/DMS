@@ -90,6 +90,15 @@ model Site {
   policeRegister  PoliceRegisterEntry[]
   commissions     Commission[]
 
+  stockItems       StockItem[]
+  purchaseOrders   PurchaseOrder[]
+  goodsReceipts    GoodsReceipt[]
+  supplierInvoices SupplierInvoice[]
+  counterSales     CounterSale[]
+  transfersOut     StockTransfer[]   @relation("TransferFrom")
+  transfersIn      StockTransfer[]   @relation("TransferTo")
+  cycleCounts      CycleCount[]
+
   @@map("site")
 }
 
@@ -108,6 +117,8 @@ model Brand {
   oemSupplier     Supplier?        @relation("BrandOemSupplier", fields: [oemSupplierId], references: [id])
   accountMappings AccountMapping[]
   catalogueModels CatalogueModel[]
+
+  parts Part[]
 
   @@map("brand")
 }
@@ -323,6 +334,7 @@ model Customer {
   salesOrders      SalesOrder[]
   reservations     Reservation[]
   voPurchases      VoPurchase[]
+  counterSales     CounterSale[]
 
   @@index([displayName])
   @@map("customer")
@@ -552,6 +564,11 @@ model Supplier {
   voPurchases      VoPurchase[]
   vehicleCosts     VehicleCostLine[]
 
+  parts            Part[]
+  purchaseOrders   PurchaseOrder[]
+  goodsReceipts    GoodsReceipt[]
+  supplierInvoices SupplierInvoice[]
+
   @@map("supplier")
 }
 
@@ -738,6 +755,7 @@ model Invoice {
   lines             InvoiceLine[]
   allocations       PaymentAllocation[]
   salesOrder        SalesOrder?
+  counterSale       CounterSale?
 
   @@index([customerId, status])
   @@index([sourceType, sourceId])
@@ -1323,4 +1341,410 @@ model VoPriceChange {
 
   @@index([vehicleId])
   @@map("vo_price_change")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Parts (Phase 4)
+// ─────────────────────────────────────────────────────────────
+
+model DiscountCode {
+  id    String         @id @default(cuid())
+  code  String         @unique
+  label String
+  rates DiscountRate[]
+  parts Part[]
+
+  @@map("discount_code")
+}
+
+/// The discount matrix: one rate per discount code and customer price class.
+model DiscountRate {
+  id             String       @id @default(cuid())
+  discountCodeId String
+  priceClass     PriceClass
+  discountBp     Int
+  discountCode   DiscountCode @relation(fields: [discountCodeId], references: [id], onDelete: Cascade)
+
+  @@unique([discountCodeId, priceClass])
+  @@map("discount_rate")
+}
+
+model Part {
+  id               String              @id @default(cuid())
+  partNumber       String              @unique
+  description      String
+  family           String
+  brandId          String? // OEM part of this brand; null for aftermarket and consumables
+  supplierId       String // usual supplier (the brand's OEM for OEM parts)
+  discountCodeId   String
+  unit             String              @default("EA") // EA, L, M
+  retailPriceCents Int // excl. VAT
+  listCostCents    Int // supplier price excl. VAT, used on purchase orders
+  vatRateCode      String              @default("STANDARD")
+  active           Boolean             @default(true)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  brand            Brand?              @relation(fields: [brandId], references: [id])
+  supplier         Supplier            @relation(fields: [supplierId], references: [id])
+  discountCode     DiscountCode        @relation(fields: [discountCodeId], references: [id])
+  stock            StockItem[]
+  replacedBy       PartSupersession?   @relation("SupersededPart")
+  replaces         PartSupersession[]  @relation("ReplacementPart")
+  poLines          PurchaseOrderLine[]
+  counterLines     CounterSaleLine[]
+  transferLines    StockTransferLine[]
+
+  @@index([brandId])
+  @@index([family])
+  @@map("part")
+}
+
+model PartSupersession {
+  id          String   @id @default(cuid())
+  oldPartId   String   @unique
+  newPartId   String
+  effectiveOn DateTime @db.Date
+  createdAt   DateTime @default(now())
+  oldPart     Part     @relation("SupersededPart", fields: [oldPartId], references: [id])
+  newPart     Part     @relation("ReplacementPart", fields: [newPartId], references: [id])
+
+  @@index([newPartId])
+  @@map("part_supersession")
+}
+
+/// A part held at a site. `valueCents` is the sum of its movements' values, so the parts stock
+/// account always equals the sub-ledger; `pmpCents` is the weighted average cost per unit.
+model StockItem {
+  id             String           @id @default(cuid())
+  partId         String
+  siteId         String
+  bin            String?
+  qtyOnHand      Decimal          @default(0) @db.Decimal(12, 3)
+  qtyReserved    Decimal          @default(0) @db.Decimal(12, 3)
+  valueCents     Int              @default(0)
+  pmpCents       Decimal          @default(0) @db.Decimal(18, 4)
+  minQty         Decimal          @default(0) @db.Decimal(12, 3)
+  maxQty         Decimal          @default(0) @db.Decimal(12, 3)
+  lastMovementOn DateTime?        @db.Date
+  lastCountedOn  DateTime?        @db.Date
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  part           Part             @relation(fields: [partId], references: [id])
+  site           Site             @relation(fields: [siteId], references: [id])
+  movements      PartMovement[]
+  countLines     CycleCountLine[]
+
+  @@unique([partId, siteId])
+  @@index([siteId])
+  @@map("stock_item")
+}
+
+enum PartMovementKind {
+  OPENING
+  RECEIPT
+  ISSUE_RO
+  COUNTER_SALE
+  TRANSFER_OUT
+  TRANSFER_IN
+  ADJUSTMENT
+  RETURN_SUPPLIER
+  RETURN_CUSTOMER
+}
+
+/// The parts stock ledger: one row per movement, signed quantities and values.
+model PartMovement {
+  id              String           @id @default(cuid())
+  stockItemId     String
+  partId          String
+  siteId          String
+  kind            PartMovementKind
+  qty             Decimal          @db.Decimal(12, 3)
+  unitCostCents   Decimal          @db.Decimal(18, 4)
+  valueCents      Int
+  qtyAfter        Decimal          @db.Decimal(12, 3)
+  valueAfterCents Int
+  pmpAfterCents   Decimal          @db.Decimal(18, 4)
+  sourceType      String
+  sourceId        String?
+  reference       String?
+  businessDate    DateTime         @db.Date
+  userId          String?
+  createdAt       DateTime         @default(now())
+  stockItem       StockItem        @relation(fields: [stockItemId], references: [id])
+
+  @@index([stockItemId, createdAt])
+  @@index([siteId, businessDate])
+  @@index([sourceType, sourceId])
+  @@map("part_movement")
+}
+
+enum PurchaseOrderKind {
+  STOCK
+  EMERGENCY
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  SENT
+  PARTIAL
+  RECEIVED
+  CLOSED
+  CANCELLED
+}
+
+model PurchaseOrder {
+  id          String              @id @default(cuid())
+  number      String              @unique
+  siteId      String
+  supplierId  String
+  kind        PurchaseOrderKind   @default(STOCK)
+  status      PurchaseOrderStatus @default(DRAFT)
+  createdOn   DateTime            @db.Date
+  sentOn      DateTime?           @db.Date
+  expectedOn  DateTime?           @db.Date
+  closedOn    DateTime?           @db.Date
+  notes       String?
+  createdById String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  site        Site                @relation(fields: [siteId], references: [id])
+  supplier    Supplier            @relation(fields: [supplierId], references: [id])
+  lines       PurchaseOrderLine[]
+  receipts    GoodsReceipt[]
+
+  @@index([siteId, status])
+  @@index([supplierId])
+  @@map("purchase_order")
+}
+
+model PurchaseOrderLine {
+  id              String             @id @default(cuid())
+  purchaseOrderId String
+  lineNo          Int
+  partId          String
+  qtyOrdered      Decimal            @db.Decimal(12, 3)
+  qtyReceived     Decimal            @default(0) @db.Decimal(12, 3)
+  unitCostCents   Int
+  purchaseOrder   PurchaseOrder      @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  part            Part               @relation(fields: [partId], references: [id])
+  receiptLines    GoodsReceiptLine[]
+
+  @@unique([purchaseOrderId, lineNo])
+  @@index([partId])
+  @@map("purchase_order_line")
+}
+
+model GoodsReceipt {
+  id              String             @id @default(cuid())
+  number          String             @unique
+  siteId          String
+  purchaseOrderId String
+  supplierId      String
+  receivedOn      DateTime           @db.Date
+  deliveryNote    String?
+  valueCents      Int
+  createdById     String?
+  createdAt       DateTime           @default(now())
+  site            Site               @relation(fields: [siteId], references: [id])
+  purchaseOrder   PurchaseOrder      @relation(fields: [purchaseOrderId], references: [id])
+  supplier        Supplier           @relation(fields: [supplierId], references: [id])
+  lines           GoodsReceiptLine[]
+
+  @@index([supplierId, siteId])
+  @@map("goods_receipt")
+}
+
+model GoodsReceiptLine {
+  id            String                @id @default(cuid())
+  receiptId     String
+  poLineId      String
+  partId        String
+  qty           Decimal               @db.Decimal(12, 3)
+  unitCostCents Int
+  valueCents    Int
+  qtyInvoiced   Decimal               @default(0) @db.Decimal(12, 3)
+  receipt       GoodsReceipt          @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  poLine        PurchaseOrderLine     @relation(fields: [poLineId], references: [id])
+  invoiceLines  SupplierInvoiceLine[]
+
+  @@map("goods_receipt_line")
+}
+
+enum SupplierInvoiceStatus {
+  VARIANCE
+  MATCHED
+  PAID
+  REJECTED
+}
+
+/// A supplier's invoice matched to goods receipts. Posted when matched (or when a variance is approved).
+model SupplierInvoice {
+  id                String                @id @default(cuid())
+  number            String                @unique
+  siteId            String
+  supplierId        String
+  supplierReference String
+  invoiceDate       DateTime              @db.Date
+  dueDate           DateTime              @db.Date
+  status            SupplierInvoiceStatus
+  totalExclVatCents Int
+  vatCents          Int
+  totalInclVatCents Int
+  receiptValueCents Int
+  varianceCents     Int
+  entryId           String?
+  paymentId         String?
+  decidedById       String?
+  decidedOn         DateTime?             @db.Date
+  notes             String?
+  createdById       String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  site              Site                  @relation(fields: [siteId], references: [id])
+  supplier          Supplier              @relation(fields: [supplierId], references: [id])
+  lines             SupplierInvoiceLine[]
+
+  @@unique([supplierId, supplierReference])
+  @@index([siteId, status])
+  @@map("supplier_invoice")
+}
+
+model SupplierInvoiceLine {
+  id                String           @id @default(cuid())
+  invoiceId         String
+  receiptLineId     String
+  partId            String
+  qty               Decimal          @db.Decimal(12, 3)
+  unitCostCents     Int
+  amountCents       Int
+  receiptValueCents Int
+  varianceCents     Int
+  invoice           SupplierInvoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  receiptLine       GoodsReceiptLine @relation(fields: [receiptLineId], references: [id])
+
+  @@map("supplier_invoice_line")
+}
+
+enum CounterSaleStatus {
+  QUOTE
+  CONFIRMED
+  INVOICED
+  CANCELLED
+}
+
+model CounterSale {
+  id                String            @id @default(cuid())
+  number            String            @unique
+  siteId            String
+  customerId        String
+  priceClass        PriceClass
+  status            CounterSaleStatus @default(QUOTE)
+  reference         String?
+  createdOn         DateTime          @db.Date
+  confirmedOn       DateTime?         @db.Date
+  invoicedOn        DateTime?         @db.Date
+  cancelledOn       DateTime?         @db.Date
+  invoiceId         String?           @unique
+  totalExclVatCents Int               @default(0)
+  costCents         Int               @default(0)
+  createdById       String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  site              Site              @relation(fields: [siteId], references: [id])
+  customer          Customer          @relation(fields: [customerId], references: [id])
+  invoice           Invoice?          @relation(fields: [invoiceId], references: [id])
+  lines             CounterSaleLine[]
+
+  @@index([siteId, status])
+  @@index([customerId])
+  @@map("counter_sale")
+}
+
+model CounterSaleLine {
+  id               String      @id @default(cuid())
+  saleId           String
+  lineNo           Int
+  partId           String
+  qty              Decimal     @db.Decimal(12, 3)
+  unitPriceCents   Int
+  discountBp       Int
+  lineExclVatCents Int
+  unitCostCents    Decimal?    @db.Decimal(18, 4)
+  costCents        Int?
+  requestedNumber  String? // the number asked for when it was superseded
+  sale             CounterSale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  part             Part        @relation(fields: [partId], references: [id])
+
+  @@unique([saleId, lineNo])
+  @@map("counter_sale_line")
+}
+
+model StockTransfer {
+  id            String              @id @default(cuid())
+  number        String              @unique
+  fromSiteId    String
+  toSiteId      String
+  transferredOn DateTime            @db.Date
+  valueCents    Int
+  notes         String?
+  createdById   String?
+  createdAt     DateTime            @default(now())
+  fromSite      Site                @relation("TransferFrom", fields: [fromSiteId], references: [id])
+  toSite        Site                @relation("TransferTo", fields: [toSiteId], references: [id])
+  lines         StockTransferLine[]
+
+  @@map("stock_transfer")
+}
+
+model StockTransferLine {
+  id            String        @id @default(cuid())
+  transferId    String
+  partId        String
+  qty           Decimal       @db.Decimal(12, 3)
+  unitCostCents Decimal       @db.Decimal(18, 4)
+  valueCents    Int
+  transfer      StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  part          Part          @relation(fields: [partId], references: [id])
+
+  @@map("stock_transfer_line")
+}
+
+enum CycleCountStatus {
+  OPEN
+  POSTED
+  CANCELLED
+}
+
+model CycleCount {
+  id                 String           @id @default(cuid())
+  number             String           @unique
+  siteId             String
+  status             CycleCountStatus @default(OPEN)
+  label              String
+  createdOn          DateTime         @db.Date
+  postedOn           DateTime?        @db.Date
+  varianceValueCents Int              @default(0)
+  createdById        String?
+  postedById         String?
+  createdAt          DateTime         @default(now())
+  site               Site             @relation(fields: [siteId], references: [id])
+  lines              CycleCountLine[]
+
+  @@index([siteId, status])
+  @@map("cycle_count")
+}
+
+model CycleCountLine {
+  id                 String     @id @default(cuid())
+  countId            String
+  stockItemId        String
+  expectedQty        Decimal    @db.Decimal(12, 3)
+  countedQty         Decimal?   @db.Decimal(12, 3)
+  varianceQty        Decimal?   @db.Decimal(12, 3)
+  varianceValueCents Int?
+  count              CycleCount @relation(fields: [countId], references: [id], onDelete: Cascade)
+  stockItem          StockItem  @relation(fields: [stockItemId], references: [id])
+
+  @@unique([countId, stockItemId])
+  @@map("cycle_count_line")
 }

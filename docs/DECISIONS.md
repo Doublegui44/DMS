@@ -157,3 +157,37 @@ Until Phase 3, the vehicle screens could set a VN to IN_STOCK by hand. Now that 
 - **Creation:** `createVehicle` called from a screen accepts only customer cars. New cars enter stock through a factory order, used cars through a purchase or a trade-in. The seed creates its v1 stock as a trusted caller and books it as history (D-044).
 - **Status and commercial data:** `changeVehicleStatus` and `patchVehicle` refuse callers that are not `trusted` (ConflictError). Only the sales flows call them, in the command that books the matching effects. The vehicle page keeps the status history and links a stock car to its sales page.
 - **Edits:** `updateVehicle` still corrects descriptive fields (VIN, plate, version, mileage…). On a stock car it keeps the site, brand, owner, list price and VAT regime, which drive the per-site stock accounts, the OEM account, the VAT treatment and the discount approvals (D-036). VO prices change through repricing. Moving a car to another site needs a transfer flow, deferred.
+
+## D-049 — Parts stock: perpetual, value-based PMP, one ledger
+- **Valuation:** each stock item (part × site) holds its quantity, value and PMP. A receipt adds its value; an issue takes `qty × PMP` out, and the last unit takes the remaining value, so no rounding residue stays in stock. PMP is kept to 4 decimals of a cent (`Decimal(18,4)`), and amounts are whole cents.
+- **Ledger:** every change goes through `moveStock`, which locks the row (`SELECT … FOR UPDATE`) and writes a `PartMovement` (signed qty and value, qty and PMP after). Movements are immutable (trigger), and a CHECK constraint forbids negative stock (assumption 12).
+- **Books:** each movement posts in the same command. The parts stock account 373000 therefore always equals the sum of the stock items, per site (checked by the seed and the integration tests).
+- **Units:** quantities are `Decimal(12,3)`. Parts sold by the unit (`EA`) must be whole; litres and metres may be fractional. Screens accept a comma as decimal separator.
+
+## D-050 — Goods received not invoiced, then three-way match
+- **Receipt:** stock in (Dr 373000 / Cr 603730), and the purchase is accrued (Dr 607300 / Cr 408100, party = supplier), both at the order price.
+- **Supplier invoice:** it bills receipt lines (partially if needed). Dr 408100 at the receipt value, the price difference to 607300, deductible VAT 445660, Cr 401 (401100 for OEMs, else 401000). 408100 returns to zero for that receipt.
+- **Tolerance:** the setting `parts.invoiceTolerance` is max(€5, 1 %) of the receipt value by default. Within it, the invoice is MATCHED and posted at once. Above it, the invoice waits in VARIANCE until someone with `parts.purchase_order:validate` approves it (posted then) or rejects it (with a reason; the receipt lines become billable again).
+- **Variance goes to purchases, not to stock.** The goods may already be sold, and revaluing the PMP after the fact would break the ledger.
+- **Payment:** `paySupplierInvoice` records the outgoing payment and letters it with the invoice line on 401. This also closes the Phase 3 gap for OEM parts (D-039 stays for vehicles).
+
+## D-051 — Inter-site transfers through a liaison account
+Sites are one legal entity, so a transfer is not a sale. It moves stock at the sending site's PMP. Each site posts its own side through 181000 (`SITE_LIAISON`): the sender Cr 373000 / Dr 181000, the receiver Dr 373000 / Cr 181000. Group-wide, 181000 nets to zero.
+
+## D-052 — Supersessions
+A supersession (old → new, effective date) applies from its date. Counter sales and orders asked for the old number use the successor, and the line keeps the number asked for. Stock already held under the old number is still sold, counted and transferred under it. Replenishment skips superseded parts, and loops are refused.
+
+## D-053 — Counter sale lifecycle
+- **QUOTE:** reserves nothing.
+- **CONFIRMED:** reserves the quantity (`qtyReserved`), so available stock = on hand − reserved.
+- **INVOICED:** takes the parts out at PMP and issues the invoice through accounting. The price comes from the retail price less the discount for the part's discount code × the sale's price class, which defaults to the customer's. Revenue goes to 707300 / 707400 / 707500 (retail and trade / warranty / internal) by price class.
+- **Payment:** individuals pay at the counter. Companies with terms go on account (assumption 11). Taking money needs `accounting.payment:create`.
+
+## D-054 — Parts seed: opening stock in the opening entry, then history
+- **Reference data:** about 2,000 references are created directly as reference data: two makes with their numbering style, an aftermarket range from the regional distributor, five discount codes and 40 supersessions dated during the history.
+- **Opening stock:** `registerOpeningStock` (system actor only, bulk inserts, OPENING movements, no posting) creates each site's stock. A new `opening` history hook runs it before the accounting opening entry, which now carries 373000 per site.
+- **History:** six months run inside the accounting day loop (`composeHooks(sales, parts)`) as the parts managers, the Nantes advisor and the accountant. This covers counter sales, weekly suggested orders (some lines short and received later), supplier invoices (a few variances approved or rejected and re-invoiced), payments at due date, emergency orders, transfers and monthly cycle counts. The current week's orders and the current month's counts are left open for the demo, and some items have had no movement for 14–20 months for the obsolescence report.
+- **Determinism:** the seed uses its own Faker (seed 4343). It adds about 30 s to the seed (≈ 100 s in total).
+
+## D-055 — Entry links follow the entry permission
+Parts screens show journal entry numbers to everyone who can see the document, but link them only for users with `accounting.entry:view` (`EntryLink`). Managers outside accounting therefore never land on /forbidden.

@@ -57,16 +57,18 @@ Each phase ends with: migrations applied, seed updated, tests green, app running
 - **Done when:** Flow 1 e2e passes → `tests/e2e/sales.spec.ts` (lead → quote with trade-in → order → invoice → payment → delivery; trade-in in VO intake; VN stock down by its cost and VO stock up by the offer on the trial balance; sale, cost-of-sale, trade-in and receipt entries present)
 - Deferred: supplier invoices and payments (OEM and traders stay unpaid in 401, D-039 → Phase 4), lender payout clearing 467300, order and invoice PDFs (Phase 6), VO reconditioning through workshop repair orders (Phase 5), sales and stock reports (Phase 6), editing approval rules and catalogue in the UI, transferring a stock car to another site (D-048).
 
-## Phase 4 — Parts
-- [ ] Catalogue, supersessions, discount codes × price class
-- [ ] Stock per site/bin, PMP valuation, min/max, movements ledger
-- [ ] Purchasing: suggested PO from min/max, stock vs. emergency orders, receipt, backorders
-- [ ] Supplier invoice matching (qty/price variance)
-- [ ] Counter sales: quote → sale → invoice
-- [ ] Inter-site transfer, cycle counts with variance posting, obsolescence report (≥ 12 months)
-- [ ] Seed: ~2,000 references with stock
-- [ ] Tests: PMP, discount resolution, variance entries; **e2e flow 5**
-- **Done when:** Flow 5 e2e passes
+## Phase 4 — Parts ✅
+- [x] Catalogue (OEM per make + aftermarket), supersessions (D-052), discount codes × price class matrix
+- [x] Stock per site/bin, value-based PMP, min/max, immutable movements ledger (D-049), obsolescence report (6–24 months)
+- [x] Purchasing: suggested orders from min/max net of what is on order, stock vs. emergency orders, receipts with backorders, close/cancel
+- [x] Goods received not invoiced and supplier invoice matching with tolerance and approval (D-050), supplier payment and lettering
+- [x] Counter sales: quote → confirm (reservation) → invoice at PMP, price class discounts, paid at the counter or on account (D-053)
+- [x] Inter-site transfers through 181000 (D-051), cycle counts with variance posting
+- [x] Dashboard parts KPIs; screens: catalogue, part, discount matrix, stock, stock item, movements, obsolete stock, transfers, purchase orders, suggestions, supplier invoices, counter sales, cycle counts; CSV exports
+- [x] Seed: ~2,000 references, opening stock in the opening entry, six months of parts activity (D-054)
+- [x] Tests: PMP, pricing, replenishment, tolerance, postings (unit); receipts/PMP, matching, variance, payment, counter, transfers, counts, opening stock, 373000 = sub-ledger (integration); **e2e Flow 5**
+- **Done when:** Flow 5 e2e passes → `tests/e2e/parts.spec.ts` (item raised below min → suggested order → sent → received → PMP recalculated → supplier invoice matched → paid; 373000 up by the receipt and 408100 back where it was on the trial balance; invoice entry with 408100, 445660 and 401)
+- Deferred: issues to repair orders (Phase 5), supplier returns and customer returns (movement kinds exist), parts reports (Phase 6), editing the tolerance and lead times in the UI.
 
 ## Phase 5 — After-sales (workshop)
 - [ ] Labour operation catalogue (standard times), labour rates per site

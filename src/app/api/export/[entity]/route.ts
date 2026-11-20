@@ -7,6 +7,7 @@ import { listCustomers, listVehicles } from "@/modules/core";
 import { listAuditLog, listUsers } from "@/modules/admin";
 import { listAccounts, listEntries, listInvoices, listPayments } from "@/modules/accounting";
 import { listLeads, listOrders, listPoliceRegister, listVnStock, listVoStock } from "@/modules/sales";
+import { listCounterSales, listMovements, listObsoleteStock, listParts, listPurchaseOrders, listStockItems, listSupplierInvoices } from "@/modules/parts";
 import { isoDate } from "@/lib/dates";
 
 type Exporter = (sp: Record<string, string>) => Promise<{ rows: Record<string, unknown>[]; columns: { key: string; header: string }[] }>;
@@ -373,6 +374,211 @@ const EXPORTERS: Record<string, Exporter> = {
         { key: "action", header: "Action" },
         { key: "entityType", header: "Entity" },
         { key: "entityId", header: "Entity id" },
+      ],
+    };
+  },
+  async parts(sp) {
+    const { rows } = await query((ctx) => listParts(ctx, parseListParams(sp), { all: true }));
+    return {
+      rows: rows.map((p) => ({
+        ...p,
+        brand: p.brand?.name,
+        supplier: p.supplier.name,
+        discountCode: p.discountCode.code,
+        replacedBy: p.replacedBy?.newPart.partNumber,
+        retailPrice: centsToCsv(p.retailPriceCents),
+        listCost: centsToCsv(p.listCostCents),
+        onHandGroup: p.onHandGroup.toString(),
+      })),
+      columns: [
+        { key: "partNumber", header: "Part number" },
+        { key: "description", header: "Description" },
+        { key: "family", header: "Family" },
+        { key: "brand", header: "Brand" },
+        { key: "supplier", header: "Supplier" },
+        { key: "discountCode", header: "Discount code" },
+        { key: "unit", header: "Unit" },
+        { key: "retailPrice", header: "Retail price excl. VAT" },
+        { key: "listCost", header: "List cost" },
+        { key: "onHandGroup", header: "On hand (group)" },
+        { key: "replacedBy", header: "Replaced by" },
+        { key: "active", header: "Active" },
+      ],
+    };
+  },
+  async "parts-stock"(sp) {
+    const { rows } = await query((ctx) => listStockItems(ctx, parseListParams(sp), { all: true }));
+    return {
+      rows: rows.map((i) => ({
+        site: i.site.code,
+        partNumber: i.part.partNumber,
+        description: i.part.description,
+        family: i.part.family,
+        bin: i.bin,
+        onHand: i.qtyOnHand.toString(),
+        reserved: i.qtyReserved.toString(),
+        available: i.available.toString(),
+        min: i.minQty.toString(),
+        max: i.maxQty.toString(),
+        pmp: centsToCsv(Math.round(Number(i.pmpCents))),
+        value: centsToCsv(i.valueCents),
+        lastMovementOn: i.lastMovementOn ? isoDate(i.lastMovementOn) : "",
+      })),
+      columns: [
+        { key: "site", header: "Site" },
+        { key: "partNumber", header: "Part number" },
+        { key: "description", header: "Description" },
+        { key: "family", header: "Family" },
+        { key: "bin", header: "Bin" },
+        { key: "onHand", header: "On hand" },
+        { key: "reserved", header: "Reserved" },
+        { key: "available", header: "Available" },
+        { key: "min", header: "Min" },
+        { key: "max", header: "Max" },
+        { key: "pmp", header: "PMP" },
+        { key: "value", header: "Value" },
+        { key: "lastMovementOn", header: "Last movement" },
+      ],
+    };
+  },
+  async "parts-movements"(sp) {
+    const { rows } = await query((ctx) => listMovements(ctx, parseListParams(sp, { sort: "createdAt", dir: "desc" }), { all: true }));
+    return {
+      rows: rows.map((m) => ({
+        businessDate: isoDate(m.businessDate),
+        site: m.stockItem.site.code,
+        partNumber: m.stockItem.part.partNumber,
+        kind: m.kind,
+        reference: m.reference,
+        qty: m.qty.toString(),
+        unitCost: centsToCsv(Math.round(Number(m.unitCostCents))),
+        value: centsToCsv(m.valueCents),
+        qtyAfter: m.qtyAfter.toString(),
+        pmpAfter: centsToCsv(Math.round(Number(m.pmpAfterCents))),
+      })),
+      columns: [
+        { key: "businessDate", header: "Date" },
+        { key: "site", header: "Site" },
+        { key: "partNumber", header: "Part number" },
+        { key: "kind", header: "Movement" },
+        { key: "reference", header: "Reference" },
+        { key: "qty", header: "Qty" },
+        { key: "unitCost", header: "Unit cost" },
+        { key: "value", header: "Value" },
+        { key: "qtyAfter", header: "Qty after" },
+        { key: "pmpAfter", header: "PMP after" },
+      ],
+    };
+  },
+  async "parts-obsolete"(sp) {
+    const { rows } = await query((ctx) => listObsoleteStock(ctx, parseListParams(sp), { all: true }));
+    return {
+      rows: rows.map((i) => ({
+        site: i.site.code,
+        partNumber: i.part.partNumber,
+        description: i.part.description,
+        family: i.part.family,
+        bin: i.bin,
+        onHand: i.qtyOnHand.toString(),
+        value: centsToCsv(i.valueCents),
+        lastMovementOn: i.lastMovementOn ? isoDate(i.lastMovementOn) : "",
+      })),
+      columns: [
+        { key: "site", header: "Site" },
+        { key: "partNumber", header: "Part number" },
+        { key: "description", header: "Description" },
+        { key: "family", header: "Family" },
+        { key: "bin", header: "Bin" },
+        { key: "onHand", header: "On hand" },
+        { key: "value", header: "Value" },
+        { key: "lastMovementOn", header: "Last movement" },
+      ],
+    };
+  },
+  async "purchase-orders"(sp) {
+    const { rows } = await query((ctx) => listPurchaseOrders(ctx, parseListParams(sp, { sort: "createdOn", dir: "desc" }), { all: true }));
+    return {
+      rows: rows.map((po) => ({
+        number: po.number,
+        createdOn: isoDate(po.createdOn),
+        site: po.site.code,
+        supplier: po.supplier.name,
+        kind: po.kind,
+        status: po.status,
+        lines: po.lineCount,
+        value: centsToCsv(po.valueCents),
+        expectedOn: po.expectedOn ? isoDate(po.expectedOn) : "",
+      })),
+      columns: [
+        { key: "number", header: "Number" },
+        { key: "createdOn", header: "Date" },
+        { key: "site", header: "Site" },
+        { key: "supplier", header: "Supplier" },
+        { key: "kind", header: "Kind" },
+        { key: "status", header: "Status" },
+        { key: "lines", header: "Lines" },
+        { key: "value", header: "Value" },
+        { key: "expectedOn", header: "Expected" },
+      ],
+    };
+  },
+  async "supplier-invoices"(sp) {
+    const { rows } = await query((ctx) => listSupplierInvoices(ctx, parseListParams(sp, { sort: "invoiceDate", dir: "desc" }), { all: true }));
+    return {
+      rows: rows.map((i) => ({
+        number: i.number,
+        supplierReference: i.supplierReference,
+        invoiceDate: isoDate(i.invoiceDate),
+        dueDate: isoDate(i.dueDate),
+        site: i.site.code,
+        supplier: i.supplier.name,
+        status: i.status,
+        totalExcl: centsToCsv(i.totalExclVatCents),
+        vat: centsToCsv(i.vatCents),
+        totalIncl: centsToCsv(i.totalInclVatCents),
+        variance: centsToCsv(i.varianceCents),
+      })),
+      columns: [
+        { key: "number", header: "Number" },
+        { key: "supplierReference", header: "Supplier reference" },
+        { key: "invoiceDate", header: "Date" },
+        { key: "dueDate", header: "Due" },
+        { key: "site", header: "Site" },
+        { key: "supplier", header: "Supplier" },
+        { key: "status", header: "Status" },
+        { key: "totalExcl", header: "Total excl. VAT" },
+        { key: "vat", header: "VAT" },
+        { key: "totalIncl", header: "Total incl. VAT" },
+        { key: "variance", header: "Variance" },
+      ],
+    };
+  },
+  async "counter-sales"(sp) {
+    const { rows } = await query((ctx) => listCounterSales(ctx, parseListParams(sp, { sort: "createdOn", dir: "desc" }), { all: true }));
+    return {
+      rows: rows.map((s) => ({
+        number: s.number,
+        createdOn: isoDate(s.createdOn),
+        site: s.site.code,
+        customer: s.customer.displayName,
+        priceClass: s.priceClass,
+        status: s.status,
+        lines: s._count.lines,
+        totalExcl: centsToCsv(s.totalExclVatCents),
+        cost: s.status === "INVOICED" ? centsToCsv(s.costCents) : "",
+        invoice: s.invoice?.number,
+      })),
+      columns: [
+        { key: "number", header: "Number" },
+        { key: "createdOn", header: "Date" },
+        { key: "site", header: "Site" },
+        { key: "customer", header: "Customer" },
+        { key: "priceClass", header: "Price class" },
+        { key: "status", header: "Status" },
+        { key: "lines", header: "Lines" },
+        { key: "totalExcl", header: "Total excl. VAT" },
+        { key: "cost", header: "Cost" },
+        { key: "invoice", header: "Invoice" },
       ],
     };
   },

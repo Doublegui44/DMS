@@ -19,6 +19,7 @@ export const DEFAULT_ACCOUNTS: AccountDef[] = [
   { code: "110000", label: "Report à nouveau", type: "EQUITY" },
   { code: "120000", label: "Résultat de l'exercice", type: "EQUITY" },
   { code: "164000", label: "Emprunts auprès des établissements de crédit", type: "LIABILITY" },
+  { code: "181000", label: "Comptes de liaison des établissements", type: "EQUITY" },
   // Class 2 — fixed assets
   { code: "213500", label: "Installations générales, agencements", type: "ASSET" },
   { code: "215400", label: "Matériel industriel (atelier)", type: "ASSET" },
@@ -149,6 +150,7 @@ export const DEFAULT_MAPPINGS: Record<string, string> = {
   CAPITAL: "101000",
   OPENING_BALANCE: "890000",
   SUSPENSE: "471000",
+  SITE_LIAISON: "181000", // stock moved between sites of the same legal entity nets to zero
 };
 
 /** Revenue keys offered on manual invoices, with their natural department. */

@@ -291,6 +291,90 @@ export function buildStockMovementEntry(m: {
 }
 
 /**
+ * Parts stock movement (perpetual inventory): the parts stock account against stock variation
+ * (receipts, sales, count variances) or against the liaison account (transfers between sites).
+ * `valueCents` is signed: positive when value enters the site's stock. Journal OD.
+ */
+export function buildPartsStockEntry(m: {
+  siteId: string;
+  date: Date;
+  valueCents: Cents;
+  counterpart: "VARIATION" | "LIAISON";
+  label: string;
+  sourceType: string;
+  sourceId: string | null;
+}): EntryDraft {
+  if (!Number.isSafeInteger(m.valueCents) || m.valueCents === 0) throw new RangeError("A stock movement needs a non-zero amount in cents");
+  const label = m.label.slice(0, 120);
+  const amount = Math.abs(m.valueCents);
+  const entering = m.valueCents > 0;
+  const stock: DraftLine = { account: { key: "STOCK_PARTS" }, debitCents: entering ? amount : 0, creditCents: entering ? 0 : amount, label };
+  const other: DraftLine =
+    m.counterpart === "VARIATION"
+      ? { account: { key: "STOCK_VARIATION_PARTS" }, debitCents: stock.creditCents, creditCents: stock.debitCents, label, departmentCode: "PARTS" }
+      : { account: { key: "SITE_LIAISON" }, debitCents: stock.creditCents, creditCents: stock.debitCents, label };
+  return {
+    journalCode: "OD",
+    siteId: m.siteId,
+    entryDate: m.date,
+    label,
+    sourceType: m.sourceType,
+    sourceId: m.sourceId,
+    lines: entering ? [stock, other] : [other, stock],
+  };
+}
+
+/**
+ * A supplier invoice matched to goods receipts: clears the goods-received-not-invoiced accrual at
+ * receipt value, books the price variance to purchases, the deductible VAT and the supplier payable.
+ * Journal AC.
+ */
+export function buildSupplierInvoiceEntry(p: {
+  siteId: string;
+  date: Date;
+  label: string;
+  sourceType: string;
+  sourceId: string | null;
+  supplierId: string;
+  payable: AccountRef;
+  receiptValueCents: Cents;
+  varianceCents: Cents;
+  vatCents: Cents;
+  purchaseAccount: AccountRef;
+  departmentCode: DepartmentCode;
+}): EntryDraft {
+  for (const v of [p.receiptValueCents, p.varianceCents, p.vatCents]) {
+    if (!Number.isSafeInteger(v)) throw new RangeError("Amounts must be integer cents");
+  }
+  if (p.receiptValueCents < 0 || p.vatCents < 0) throw new RangeError("Receipt value and VAT cannot be negative");
+  const total = p.receiptValueCents + p.varianceCents + p.vatCents;
+  if (total <= 0) throw new RangeError("A supplier invoice must be positive");
+  const label = p.label.slice(0, 120);
+  const supplier = { partyType: "SUPPLIER" as const, partyId: p.supplierId };
+  const lines: DraftLine[] = [
+    { account: { key: "GOODS_RECEIVED_NOT_INVOICED" }, debitCents: p.receiptValueCents, creditCents: 0, label, ...supplier },
+    {
+      account: p.purchaseAccount,
+      debitCents: Math.max(p.varianceCents, 0),
+      creditCents: Math.max(-p.varianceCents, 0),
+      label: `${label} — price variance`.slice(0, 120),
+      departmentCode: p.departmentCode,
+    },
+    { account: { key: "VAT_DEDUCTIBLE_GOODS" }, debitCents: p.vatCents, creditCents: 0, label },
+    { account: p.payable, debitCents: 0, creditCents: total, label, ...supplier },
+  ];
+  return {
+    journalCode: "AC",
+    siteId: p.siteId,
+    entryDate: p.date,
+    label,
+    sourceType: p.sourceType,
+    sourceId: p.sourceId,
+    lines: compactLines(lines),
+  };
+}
+
+/**
  * Purchase or cost accrual: Dr expense lines (with department) + Dr deductible VAT / Cr one counterpart
  * (supplier payable, private seller, goods-received-not-invoiced…). Journal AC by default.
  */

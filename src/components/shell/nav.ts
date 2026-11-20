@@ -49,11 +49,11 @@ export const NAV: NavGroup[] = [
   {
     key: "parts",
     items: [
-      { key: "partsCatalogue", href: "/parts/catalogue", resource: "parts.part", icon: "Package", phase: 4 },
-      { key: "stock", href: "/parts/stock", resource: "parts.stock", icon: "Boxes", phase: 4 },
-      { key: "purchasing", href: "/parts/purchasing", resource: "parts.purchase_order", icon: "Truck", phase: 4 },
-      { key: "counter", href: "/parts/counter", resource: "parts.counter_sale", icon: "ShoppingCart", phase: 4 },
-      { key: "inventory", href: "/parts/inventory", resource: "parts.inventory", icon: "ClipboardList", phase: 4 },
+      { key: "partsCatalogue", href: "/parts/catalogue", resource: "parts.part", icon: "Package" },
+      { key: "stock", href: "/parts/stock", resource: "parts.stock", icon: "Boxes" },
+      { key: "purchasing", href: "/parts/purchasing", resource: "parts.purchase_order", icon: "Truck" },
+      { key: "counter", href: "/parts/counter", resource: "parts.counter_sale", icon: "ShoppingCart" },
+      { key: "inventory", href: "/parts/inventory", resource: "parts.inventory", icon: "ClipboardList" },
     ],
   },
   {

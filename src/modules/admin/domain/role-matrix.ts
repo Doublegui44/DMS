@@ -136,6 +136,9 @@ export const DEFAULT_ROLE_MATRIX: Record<RoleKey, Grants> = {
     "parts.counter_sale": VCE,
     "parts.inventory": ["view", "edit"],
     "workshop.repair_order": VIEW,
+    // Counter sales are invoiced and paid at the counter.
+    "accounting.invoice": VIEW,
+    "accounting.payment": ["view", "create"],
   },
 
   ACCOUNTANT: {

@@ -756,7 +756,7 @@ erDiagram
   Part ||--o{ PartSupersession : "replaced by"
   Part ||--o{ StockItem : "stocked as"
   Site ||--o{ StockItem : holds
-  StockItem ||--o{ StockMovement : ledger
+  StockItem ||--o{ PartMovement : ledger
   DiscountCode ||--o{ Part : classifies
   DiscountCode ||--o{ DiscountMatrix : "rate per price class"
   Supplier ||--o{ PurchaseOrder : receives
@@ -888,7 +888,7 @@ erDiagram
   CycleCount {
     string id PK
     string siteId FK
-    enum status "OPEN COUNTED POSTED"
+    enum status "OPEN POSTED CANCELLED"
     date businessDate
   }
   CycleCountLine {
@@ -899,6 +899,13 @@ erDiagram
     decimal countedQty
   }
 ```
+
+**As built (Phase 4):**
+- **Valuation:** stock is perpetual and value-based PMP. Every change goes through `moveStock` and writes an immutable `PartMovement`, so 373000 equals the stock items per site (D-049).
+- **Purchasing:** a receipt accrues the purchase in 408100. The supplier invoice clears 408100 at the receipt value, and any price difference goes to 607300. Above the tolerance, the invoice waits for approval (D-050).
+- **Transfers:** they go through 181000 for each site (D-051).
+- **Counter sales:** they reserve stock when confirmed and are invoiced through `createAndIssueInvoice` (D-053).
+- **Seed:** opening stock is created in bulk by `registerOpeningStock` and valued in the opening entry (D-054).
 
 ### 6.6 Accounting
 
@@ -1056,10 +1063,11 @@ Inventory is **perpetual** (see D-005): purchases go to class 60x, stock entries
 | RO customer invoice | VE | 411 | 7061 labour (WORKSHOP), 7073 parts (PARTS), 7062 sublet (WORKSHOP), 44571 |
 | RO warranty | VE | 4111 OEM warranty receivable | 7063 warranty labour (WORKSHOP), 7074 warranty parts (PARTS) |
 | RO internal (VO reconditioning) | OD | 3712 VO stock | 7064 internal labour (WORKSHOP), 7075 internal parts (PARTS) |
-| Parts issue to RO / counter | OD | 60373 (PARTS) | 3713 parts stock |
-| Parts receipt (goods received not invoiced) | OD | 3713 | 60373 (PARTS); purchase side via 408 until invoice |
-| Supplier invoice matched | AC | 6073 (PARTS) + 44566 | 401 (clears 408 accrual) |
-| Inventory variance | OD | 60373 (PARTS) | 3713 (or reverse) |
+| Parts issue to RO / counter | OD | 603730 (PARTS) | 373000 parts stock, at PMP |
+| Parts receipt (goods received not invoiced) | OD | 373000; 607300 (PARTS) | 603730 (PARTS); 408100 (party = supplier) |
+| Supplier invoice matched | AC | 408100 at receipt value, 607300 price variance, 445660 | 401100 OEM / 401000 (lettered when paid) |
+| Inventory variance | OD | 603730 (PARTS) | 373000 (or reverse) |
+| Parts transfer between sites | OD | receiver 373000; sender 181000 | receiver 181000; sender 373000 |
 | Customer payment | BQ/CA | 512 bank / 530 cash / 4671 finance company | 411 |
 | Supplier payment | BQ | 401 | 512 |
 

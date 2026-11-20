@@ -125,3 +125,38 @@ export async function balanceOf(accountCode: string, opts: { siteId?: string; pa
   });
   return (agg._sum.debitCents ?? 0) - (agg._sum.creditCents ?? 0);
 }
+
+/**
+ * Accounting org + what parts needs: open 2026 periods, the brand's OEM supplier and an
+ * aftermarket one, two discount codes with their matrix rows, four parts (one superseded by
+ * another), a retail customer and a trade (garage) customer.
+ */
+export async function resetWithParts() {
+  const org = await resetWithAccounting();
+  const { createCustomer, createSupplier } = await import("@/modules/core");
+  const { ensurePeriods } = await import("@/modules/accounting");
+  await sys((ctx) => ensurePeriods(ctx.tx, new Date("2026-01-01"), new Date("2026-12-31")));
+  const oem = await sys((ctx) => createSupplier(ctx, { name: "Peugeot France — Pièces", isOem: true, paymentTermsDays: 30 }));
+  const aftermarket = await sys((ctx) => createSupplier(ctx, { name: "Autodistribution Test", paymentTermsDays: 45 }));
+  await db.brand.update({ where: { id: org.brand.id }, data: { oemSupplierId: oem.id } });
+  const codeA = await db.discountCode.create({ data: { code: "A", label: "Fast movers", rates: { create: [{ priceClass: "TRADE", discountBp: 2_500 }, { priceClass: "INTERNAL", discountBp: 3_000 }] } } });
+  const codeB = await db.discountCode.create({ data: { code: "B", label: "Consumables", rates: { create: [{ priceClass: "TRADE", discountBp: 1_000 }] } } });
+  const part = (partNumber: string, description: string, retailPriceCents: number, listCostCents: number, extra: Record<string, unknown> = {}) =>
+    db.part.create({
+      data: { partNumber, description, family: "BRAKES", brandId: org.brand.id, supplierId: oem.id, discountCodeId: codeA.id, retailPriceCents, listCostCents, ...extra },
+    });
+  const pads = await part("1609438180", "Front brake pads", 6_500, 4_200);
+  const padsOld = await part("1609438100", "Front brake pads (old)", 6_200, 4_000);
+  const filter = await part("1109AY", "Oil filter", 1_490, 690, { family: "FILTERS" });
+  const oil = await part("ATO5W30", "Engine oil 5W-30", 1_200, 600, { family: "FLUIDS", brandId: null, supplierId: aftermarket.id, discountCodeId: codeB.id, unit: "L" });
+  await db.partSupersession.create({ data: { oldPartId: padsOld.id, newPartId: pads.id, effectiveOn: new Date("2026-01-01") } });
+  const retail = await sys((ctx) => createCustomer(ctx, { kind: "INDIVIDUAL", firstName: "Paul", lastName: "Durand", city: "Nantes" }));
+  const garage = await sys((ctx) => createCustomer(ctx, { kind: "COMPANY", companyName: "Garage du Port", priceClass: "TRADE", paymentTermsDays: 30, city: "Nantes" }));
+  return { ...org, oem, aftermarket, codeA, codeB, pads, padsOld, filter, oil, retail, garage };
+}
+
+/** Sum of the parts stock sub-ledger (stock items' values), optionally for one site. */
+export async function partsStockValue(siteId?: string) {
+  const agg = await db.stockItem.aggregate({ where: siteId ? { siteId } : {}, _sum: { valueCents: true } });
+  return agg._sum.valueCents ?? 0;
+}

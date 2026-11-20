@@ -12,9 +12,12 @@ async function nextCode(ctx: ServiceContext, accountCode: string, partyId: strin
   return letteringCode(max + 1);
 }
 
-/** Manual lettering: lines on one account (and party) that net to zero. */
-export async function letterLines(ctx: ServiceContext, lineIds: string[]) {
-  ctx.require("accounting.entry", "edit");
+/**
+ * Manual lettering: lines on one account (and party) that net to zero. Trusted callers (a module
+ * settling its own document, e.g. a supplier invoice and its payment) skip the permission check.
+ */
+export async function letterLines(ctx: ServiceContext, lineIds: string[], opts: { trusted?: boolean } = {}) {
+  if (!opts.trusted) ctx.require("accounting.entry", "edit");
   const lines = await ctx.tx.journalLine.findMany({ where: { id: { in: lineIds } } });
   if (lines.length !== lineIds.length) throw new DomainError("not_found", "Some lines were not found");
   if (lines.some((l) => l.letteringCode)) throw new DomainError("already_lettered", "Some lines are already lettered");
