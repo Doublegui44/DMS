@@ -191,3 +191,47 @@ A supersession (old → new, effective date) applies from its date. Counter sale
 
 ## D-055 — Entry links follow the entry permission
 Parts screens show journal entry numbers to everyone who can see the document, but link them only for users with `accounting.entry:view` (`EntryLink`). Managers outside accounting therefore never land on /forbidden.
+
+## D-056 — Repair order = jobs, one payer per job
+- **Shape:** a repair order (RO) holds jobs. Each job has one payer (CUSTOMER, WARRANTY, INSURANCE or INTERNAL) and labour, part and sublet lines. A job's payer sets its labour rate (customer / warranty per make / internal, `workshop.*` settings per site), its parts price class and its revenue accounts.
+- **Lifecycle:** CHECKED_IN → IN_PROGRESS (first clocking or line) → QUALITY_CHECK (automatically when every job that may proceed is done) → READY (QC passed, `workshop.repair_order:validate`) → INVOICED → CLOSED (car handed over; an individual's balance must be zero). An RO can be cancelled before invoicing only if nobody has clocked on it; its parts go back to the shelf.
+- **Additional work:** a CUSTOMER job added after check-in waits in PENDING with its estimate. Its parts are issued only once the customer approves. A declined job is never invoiced.
+- **One open RO per car**, checked by the service.
+
+## D-057 — Parts on a repair order leave stock when the job may proceed
+A part line issues the parts at once (`issuePartsToRepairOrder`, movement ISSUE_RO at PMP, posted in the same command), unless the job is still waiting for approval. Removing the line or cancelling the RO returns them at the cost they left with (RETURN_RO). The line keeps that cost, so the RO's margin is known before invoicing and 373000 still equals the stock items.
+
+## D-058 — Invoicing per payer; warranty through a claim
+`invoiceRepairOrder` issues, in one command:
+- **Customer jobs:** one invoice to the customer. It is paid at once (card, cash…) or left on account.
+- **Insurance jobs:** one invoice per insurer.
+- **Warranty jobs:** one invoice per job to the make's manufacturer account (`brand.oemCustomerId`, 45-day terms) and a warranty claim (`GA` series). The receivable sits on the OEM in 411. An accepted claim waits for the monthly remittance (`recordWarrantyRemittance`, lettered). A rejected claim credits the invoice (`creditInvoice`); the dealer absorbs the cost.
+- **Revenue:** labour 706100 / 706300 (warranty), parts 707300 / 707400, sublets 706200, by department WORKSHOP or PARTS.
+- **Sublets:** the subcontractor's purchase (604000 + deductible VAT / 401) is posted at invoicing.
+
+## D-059 — Internal repair order capitalised into the used car
+An internal RO prepares a used car in stock (INTAKE, RECONDITIONING, FOR_SALE or RESERVED). Nothing is invoiced. At invoicing:
+- An OD entry (`buildInternalWorkEntry`) charges the work at internal rates: Dr 604000 (department VO) / Cr 706400, 707500 and 706200.
+- Sales `capitaliseRepairOrder` adds a RECONDITIONING cost line and moves the vehicle stock (COST), so 372000 rises by the same amount and still equals the VO sub-ledger.
+- The workshop and parts departments thus earn their internal revenue, and the VO department carries the cost in the car's value until it is sold. Under the margin regime the preparation is not deducted from the VAT base (assumption 5).
+
+## D-060 — Clocking, productivity and efficiency
+- **Clocking:** a technician clocks on one job at a time. Clocking on another job closes the open one. Clocking off can mark the job done. Clocking for someone else needs `workshop.clocking:validate`.
+- **Definitions** (`domain/productivity.ts`):
+  - Available hours = working days (Monday–Friday) × the technician's daily capacity.
+  - Productivity = clocked ÷ available.
+  - Efficiency = billed ÷ clocked.
+  - Utilisation = billed ÷ available.
+- **Capacity:** booking an appointment refuses a technician whose booked hours for the day would exceed their capacity.
+
+## D-061 — Workshop seed
+- **Reference data:** 27 labour operations, rates, bays and one Technician row per technician user.
+- **History:** six months run inside the accounting day loop (`composeHooks(sales, parts, workshop)`, own Faker seed 4444) as the advisors, technicians and service managers. It covers:
+  - Customer visits with appointments, check-in, clocking, QC, invoicing and hand-over.
+  - Warranty jobs on cars of the group's makes up to 3 years old.
+  - Additional work, some of it declined, and insurance jobs with sublets.
+  - Internal ROs twice a week on used cars already bought on that day.
+  - The warranty desk: decisions on Mondays, remittances on the 15th.
+- **Accounting seed:** the fake workshop invoices from Phase 2 are gone; all workshop revenue now comes from real ROs.
+- **Open work for the demo:** ROs at every open stage on the last day, and appointments for the next 14 days.
+- **Cost:** the seed now takes about 200 s.

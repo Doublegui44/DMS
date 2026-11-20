@@ -6,6 +6,7 @@ import { can } from "@/lib/rbac";
 import { daysBetween, formatDate } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import { ageingLevel, getTimeline, getVehicle } from "@/modules/core";
+import { getServiceHistory } from "@/modules/workshop";
 import { Fields, PageHeader, Section } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Timeline } from "@/components/shared/timeline";
@@ -16,10 +17,13 @@ export default async function VehiclePage({ params }: { params: Promise<{ id: st
   const t = await getTranslations();
   const tv = await getTranslations("vehicle");
   const { actor } = await getRequestContext();
-  const [{ v, businessDate }, timeline] = await Promise.all([
+  const [{ v, businessDate }, timeline, service] = await Promise.all([
     query(async (ctx) => ({ v: await getVehicle(ctx, id), businessDate: ctx.businessDate })),
     query((ctx) => getTimeline(ctx, "Vehicle", id)),
+    query((ctx) => getServiceHistory(ctx, id)),
   ]);
+  const tw = await getTranslations("workshop");
+  const canCheckIn = can(actor.permissions, "workshop.repair_order", "create");
   const canEdit = can(actor.permissions, "vehicle", "edit", v.siteId ?? undefined);
   const inStock = v.stockType !== "NONE";
   const days = inStock && v.stockInDate ? daysBetween(v.stockInDate, businessDate) : null;
@@ -103,6 +107,56 @@ export default async function VehiclePage({ params }: { params: Promise<{ id: st
                   { label: tv("vatRegime"), value: tv(`vatRegimes.${v.vatRegime}`) },
                 ]}
               />
+            </Section>
+          )}
+          {service && (
+            <Section
+              title={tw("serviceHistory")}
+              actions={
+                canCheckIn && (
+                  <div className="flex gap-2">
+                    {v.stockType === "NONE" && (
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={`/workshop/planner/new?vehicle=${v.id}`}>{tw("book")}</Link>
+                      </Button>
+                    )}
+                    <Button asChild size="sm" variant="outline">
+                      <Link href={`/workshop/repair-orders/new?vehicle=${v.id}${v.stockType === "VO" ? "&kind=INTERNAL" : ""}`}>{tw("checkIn")}</Link>
+                    </Button>
+                  </div>
+                )
+              }
+            >
+              {service.appointments.map((a) => (
+                <p key={a.id} className="mb-2 text-[13px]">
+                  <StatusBadge status="BOOKED" label={tw("upcoming")} /> {formatDate(a.date)} — {a.concern}
+                </p>
+              ))}
+              {service.ros.length === 0 ? (
+                <p className="text-[13px] text-muted-foreground">{tw("noServiceHistory")}</p>
+              ) : (
+                <table className="w-full text-[13px]" data-testid="service-history">
+                  <tbody className="divide-y">
+                    {service.ros.map((r) => (
+                      <tr key={r.id} className="align-top">
+                        <td className="py-1.5 pr-3 tabular-nums text-muted-foreground">{formatDate(r.openedOn)}</td>
+                        <td className="py-1.5 pr-3">
+                          <Link className="text-primary hover:underline" href={`/workshop/repair-orders/${r.id}`}>
+                            {r.number}
+                          </Link>
+                          <div className="text-xs text-muted-foreground">{r.site.code}</div>
+                        </td>
+                        <td className="py-1.5 pr-3 tabular-nums">{r.mileageIn.toLocaleString("en-GB")} km</td>
+                        <td className="py-1.5 pr-3">{r.jobs.map((j) => j.description).join(" · ")}</td>
+                        <td className="py-1.5 pr-3 text-right tabular-nums">{formatMoney(r.totalExclVatCents)}</td>
+                        <td className="py-1.5">
+                          <StatusBadge status={r.status} label={tw(`roStatuses.${r.status}`)} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </Section>
           )}
           <Section title={tv("statusHistory")}>

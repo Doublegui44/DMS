@@ -160,3 +160,54 @@ export async function partsStockValue(siteId?: string) {
   const agg = await db.stockItem.aggregate({ where: siteId ? { siteId } : {}, _sum: { valueCents: true } });
   return agg._sum.valueCents ?? 0;
 }
+
+/**
+ * Sales org (brand with its OEM customer, a customer) + what the workshop needs: parts with a
+ * discount code (trade, internal and warranty rates) and stock, two labour operations, an insurer,
+ * the customer's own car, and a technician, an advisor and a workshop manager at site A.
+ */
+export async function resetWithWorkshop() {
+  const org = await resetWithSales();
+  const { createCustomer, createSupplier, createVehicle } = await import("@/modules/core");
+  const { createPurchaseOrder, sendPurchaseOrder, receivePurchaseOrder } = await import("@/modules/parts");
+  const partsSupplier = await sys((ctx) => createSupplier(ctx, { name: "Peugeot France — Pièces", paymentTermsDays: 30 }));
+  const code = await db.discountCode.create({
+    data: { code: "A", label: "Fast movers", rates: { create: [{ priceClass: "TRADE", discountBp: 2_500 }, { priceClass: "INTERNAL", discountBp: 3_000 }, { priceClass: "WARRANTY", discountBp: 1_000 }] } },
+  });
+  const part = (partNumber: string, description: string, retailPriceCents: number, listCostCents: number, extra: Record<string, unknown> = {}) =>
+    db.part.create({ data: { partNumber, description, family: "BRAKES", brandId: org.brand.id, supplierId: partsSupplier.id, discountCodeId: code.id, retailPriceCents, listCostCents, ...extra } });
+  const pads = await part("1609438180", "Front brake pads", 6_500, 4_200);
+  const filter = await part("1109AY", "Oil filter", 1_490, 690, { family: "FILTERS" });
+  const oil = await part("ATO5W30", "Engine oil 5W-30", 1_200, 600, { family: "CONSUMABLES", brandId: null, unit: "L" });
+  const po = await sys((ctx) =>
+    createPurchaseOrder(ctx, { siteId: org.siteA.id, supplierId: partsSupplier.id, lines: [{ partNumber: pads.partNumber, qty: 10 }, { partNumber: filter.partNumber, qty: 10 }, { partNumber: oil.partNumber, qty: "50" }] }),
+  );
+  await sys((ctx) => sendPurchaseOrder(ctx, po.id));
+  const poLines = await db.purchaseOrderLine.findMany({ where: { purchaseOrderId: po.id } });
+  await sys((ctx) => receivePurchaseOrder(ctx, po.id, { lines: poLines.map((l) => ({ poLineId: l.id, qty: String(l.qtyOrdered) })) }));
+
+  const oilService = await db.labourOperation.create({ data: { code: "OIL-SVC", label: "Oil and filter change", category: "SERVICE", standardCentiHours: 80 } });
+  const brakePads = await db.labourOperation.create({ data: { code: "BRK-PADS-F", label: "Replace front brake pads", category: "BRAKES", brandId: org.brand.id, standardCentiHours: 120 } });
+  const insurer = await sys((ctx) => createCustomer(ctx, { kind: "COMPANY", companyName: "Assurance Test", paymentTermsDays: 30 }));
+  const car = await sys((ctx) =>
+    createVehicle(ctx, {
+      vin: "VF3AAAAA0K2222222",
+      registration: "AB-123-CD",
+      brandId: org.brand.id,
+      make: "Peugeot",
+      model: "308",
+      version: "Allure 1.2 PureTech 130",
+      mileage: 40_000,
+      fuel: "PETROL",
+      stockType: "NONE",
+      status: "CUSTOMER",
+      ownerCustomerId: org.customer.id,
+      firstRegistration: "2021-03-01",
+    }),
+  );
+  const technician = await makeActor("TECHNICIAN", org.siteA.id, "tech@t.test");
+  await db.technician.create({ data: { userId: technician.userId!, siteId: org.siteA.id, dailyCapacityCentiHours: 780 } });
+  const advisor = await makeActor("SERVICE_ADVISOR", org.siteA.id, "advisor@t.test");
+  const workshopManager = await makeActor("SERVICE_MANAGER", org.siteA.id, "workshop@t.test");
+  return { ...org, partsSupplier, code, pads, filter, oil, oilService, brakePads, insurer, car, technician, advisor, workshopManager };
+}

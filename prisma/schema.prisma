@@ -99,6 +99,13 @@ model Site {
   transfersIn      StockTransfer[]   @relation("TransferTo")
   cycleCounts      CycleCount[]
 
+  bays           WorkshopBay[]
+  technicians    Technician[]
+  appointments   Appointment[]
+  repairOrders   RepairOrder[]
+  clockings      Clocking[]
+  warrantyClaims WarrantyClaim[]
+
   @@map("site")
 }
 
@@ -118,7 +125,9 @@ model Brand {
   accountMappings AccountMapping[]
   catalogueModels CatalogueModel[]
 
-  parts Part[]
+  parts            Part[]
+  labourOperations LabourOperation[]
+  warrantyClaims   WarrantyClaim[]
 
   @@map("brand")
 }
@@ -176,6 +185,11 @@ model User {
   quotes         Quote[]           @relation("QuoteSalesperson")
   salesOrders    SalesOrder[]      @relation("OrderSalesperson")
   commissions    Commission[]
+  technician     Technician?
+  clockings      Clocking[]
+  advisedOrders  RepairOrder[]     @relation("RoAdvisor")
+  assignedJobs   RoJob[]           @relation("JobTechnician")
+  appointments   Appointment[]     @relation("AppointmentTechnician")
 
   @@map("user")
 }
@@ -335,6 +349,9 @@ model Customer {
   reservations     Reservation[]
   voPurchases      VoPurchase[]
   counterSales     CounterSale[]
+  appointments     Appointment[]
+  repairOrders     RepairOrder[]
+  insuredJobs      RoJob[]       @relation("JobPayerCustomer")
 
   @@index([displayName])
   @@map("customer")
@@ -433,6 +450,8 @@ model Vehicle {
   costLines         VehicleCostLine[]
   priceChanges      VoPriceChange[]
   tradeIns          TradeInAppraisal[]
+  appointments      Appointment[]
+  repairOrders      RepairOrder[]
 
   @@index([status, stockType])
   @@index([siteId])
@@ -568,6 +587,7 @@ model Supplier {
   purchaseOrders   PurchaseOrder[]
   goodsReceipts    GoodsReceipt[]
   supplierInvoices SupplierInvoice[]
+  roSubletLines    RoSubletLine[]
 
   @@map("supplier")
 }
@@ -756,6 +776,7 @@ model Invoice {
   allocations       PaymentAllocation[]
   salesOrder        SalesOrder?
   counterSale       CounterSale?
+  warrantyClaim     WarrantyClaim?      @relation("ClaimInvoice")
 
   @@index([customerId, status])
   @@index([sourceType, sourceId])
@@ -1393,6 +1414,7 @@ model Part {
   poLines          PurchaseOrderLine[]
   counterLines     CounterSaleLine[]
   transferLines    StockTransferLine[]
+  roPartLines      RoPartLine[]
 
   @@index([brandId])
   @@index([family])
@@ -1449,6 +1471,7 @@ enum PartMovementKind {
   ADJUSTMENT
   RETURN_SUPPLIER
   RETURN_CUSTOMER
+  RETURN_RO
 }
 
 /// The parts stock ledger: one row per movement, signed quantities and values.
@@ -1747,4 +1770,296 @@ model CycleCountLine {
 
   @@unique([countId, stockItemId])
   @@map("cycle_count_line")
+}
+
+// ── Workshop (Phase 5) ──────────────────────────────────────
+
+/// Standard-time catalogue: one operation per make (or generic when brandId is null).
+model LabourOperation {
+  id                 String         @id @default(cuid())
+  code               String         @unique
+  brandId            String?
+  label              String
+  category           String
+  standardCentiHours Int
+  active             Boolean        @default(true)
+  brand              Brand?         @relation(fields: [brandId], references: [id])
+  labourLines        RoLabourLine[]
+
+  @@index([brandId])
+  @@map("labour_operation")
+}
+
+model WorkshopBay {
+  id           String        @id @default(cuid())
+  siteId       String
+  name         String
+  active       Boolean       @default(true)
+  site         Site          @relation(fields: [siteId], references: [id])
+  appointments Appointment[]
+
+  @@unique([siteId, name])
+  @@map("workshop_bay")
+}
+
+/// A technician's workshop and daily capacity (hours they can be booked, in centi-hours).
+model Technician {
+  userId                  String  @id
+  siteId                  String
+  dailyCapacityCentiHours Int     @default(780)
+  active                  Boolean @default(true)
+  user                    User    @relation(fields: [userId], references: [id])
+  site                    Site    @relation(fields: [siteId], references: [id])
+
+  @@index([siteId])
+  @@map("technician")
+}
+
+enum AppointmentStatus {
+  BOOKED
+  ARRIVED
+  CANCELLED
+  NO_SHOW
+}
+
+model Appointment {
+  id                String            @id @default(cuid())
+  number            String            @unique
+  siteId            String
+  customerId        String
+  vehicleId         String
+  technicianId      String?
+  bayId             String?
+  date              DateTime          @db.Date
+  startMinute       Int // minutes after midnight
+  plannedCentiHours Int
+  concern           String
+  status            AppointmentStatus @default(BOOKED)
+  createdById       String?
+  createdAt         DateTime          @default(now())
+  site              Site              @relation(fields: [siteId], references: [id])
+  customer          Customer          @relation(fields: [customerId], references: [id])
+  vehicle           Vehicle           @relation(fields: [vehicleId], references: [id])
+  technician        User?             @relation("AppointmentTechnician", fields: [technicianId], references: [id])
+  bay               WorkshopBay?      @relation(fields: [bayId], references: [id])
+  repairOrder       RepairOrder?
+
+  @@index([siteId, date])
+  @@map("appointment")
+}
+
+enum RepairOrderKind {
+  CUSTOMER
+  INTERNAL // a used car in stock: its cost goes to the car's stock value
+}
+
+enum RepairOrderStatus {
+  CHECKED_IN
+  IN_PROGRESS
+  QUALITY_CHECK
+  READY
+  INVOICED
+  CLOSED
+  CANCELLED
+}
+
+model RepairOrder {
+  id                String            @id @default(cuid())
+  number            String            @unique
+  siteId            String
+  kind              RepairOrderKind   @default(CUSTOMER)
+  status            RepairOrderStatus @default(CHECKED_IN)
+  appointmentId     String?           @unique
+  customerId        String?
+  vehicleId         String
+  advisorId         String?
+  openedOn          DateTime          @db.Date
+  promisedOn        DateTime?         @db.Date
+  // Check-in
+  mileageIn         Int
+  fuelLevelPct      Int
+  damages           Json              @default("[]")
+  signedBy          String?
+  signatureDataUrl  String?
+  // Progress
+  qcById            String?
+  qcOn              DateTime?         @db.Date
+  qcNotes           String?
+  readyOn           DateTime?         @db.Date
+  invoicedOn        DateTime?         @db.Date
+  closedOn          DateTime?         @db.Date
+  cancelledOn       DateTime?         @db.Date
+  customerInvoiceId String?           @unique
+  internalEntryId   String?
+  totalExclVatCents Int               @default(0)
+  costCents         Int               @default(0) // parts at PMP + sublet cost, once invoiced
+  notes             String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  site              Site              @relation(fields: [siteId], references: [id])
+  customer          Customer?         @relation(fields: [customerId], references: [id])
+  vehicle           Vehicle           @relation(fields: [vehicleId], references: [id])
+  advisor           User?             @relation("RoAdvisor", fields: [advisorId], references: [id])
+  appointment       Appointment?      @relation(fields: [appointmentId], references: [id])
+  jobs              RoJob[]
+  clockings         Clocking[]
+  warrantyClaims    WarrantyClaim[]
+
+  @@index([siteId, status])
+  @@index([vehicleId])
+  @@index([customerId])
+  @@map("repair_order")
+}
+
+enum JobPayer {
+  CUSTOMER
+  WARRANTY
+  INTERNAL
+  INSURANCE
+}
+
+enum JobApproval {
+  NOT_REQUIRED
+  PENDING
+  APPROVED
+  DECLINED
+}
+
+enum JobStatus {
+  OPEN
+  DONE
+  DECLINED
+}
+
+model RoJob {
+  id              String         @id @default(cuid())
+  roId            String
+  lineNo          Int
+  description     String
+  payer           JobPayer       @default(CUSTOMER)
+  payerCustomerId String? // the insurer when payer = INSURANCE
+  technicianId    String?
+  isAdditional    Boolean        @default(false)
+  approval        JobApproval    @default(NOT_REQUIRED)
+  estimateCents   Int? // excl. VAT, as sent to the customer
+  approvalNote    String?
+  decidedOn       DateTime?      @db.Date
+  status          JobStatus      @default(OPEN)
+  completedOn     DateTime?      @db.Date
+  invoiceId       String?
+  createdAt       DateTime       @default(now())
+  ro              RepairOrder    @relation(fields: [roId], references: [id], onDelete: Cascade)
+  payerCustomer   Customer?      @relation("JobPayerCustomer", fields: [payerCustomerId], references: [id])
+  technician      User?          @relation("JobTechnician", fields: [technicianId], references: [id])
+  labourLines     RoLabourLine[]
+  partLines       RoPartLine[]
+  subletLines     RoSubletLine[]
+  clockings       Clocking[]
+  warrantyClaim   WarrantyClaim?
+
+  @@unique([roId, lineNo])
+  @@map("ro_job")
+}
+
+model RoLabourLine {
+  id               String           @id @default(cuid())
+  jobId            String
+  operationId      String?
+  label            String
+  billedCentiHours Int
+  rateCents        Int // per hour, excl. VAT
+  discountBp       Int              @default(0)
+  amountCents      Int
+  job              RoJob            @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  operation        LabourOperation? @relation(fields: [operationId], references: [id])
+
+  @@map("ro_labour_line")
+}
+
+/// A part on a job. Issued from stock (at PMP) when the job may proceed; returned if removed.
+model RoPartLine {
+  id              String   @id @default(cuid())
+  jobId           String
+  partId          String
+  requestedNumber String?
+  qty             Decimal  @db.Decimal(12, 3)
+  unitPriceCents  Int
+  discountBp      Int
+  amountCents     Int
+  issued          Boolean  @default(false)
+  unitCostCents   Decimal? @db.Decimal(18, 4)
+  costCents       Int?
+  job             RoJob    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  part            Part     @relation(fields: [partId], references: [id])
+
+  @@map("ro_part_line")
+}
+
+model RoSubletLine {
+  id                String   @id @default(cuid())
+  jobId             String
+  supplierId        String
+  label             String
+  costCents         Int
+  priceCents        Int
+  supplierReference String?
+  job               RoJob    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  supplier          Supplier @relation(fields: [supplierId], references: [id])
+
+  @@map("ro_sublet_line")
+}
+
+/// Time a technician spends on a job, on one business day (minutes after midnight).
+model Clocking {
+  id           String      @id @default(cuid())
+  siteId       String
+  roId         String
+  jobId        String
+  technicianId String
+  businessDate DateTime    @db.Date
+  startMinute  Int
+  endMinute    Int?
+  centiHours   Int?
+  createdAt    DateTime    @default(now())
+  site         Site        @relation(fields: [siteId], references: [id])
+  ro           RepairOrder @relation(fields: [roId], references: [id])
+  job          RoJob       @relation(fields: [jobId], references: [id])
+  technician   User        @relation(fields: [technicianId], references: [id])
+
+  @@index([technicianId, businessDate])
+  @@index([jobId])
+  @@map("clocking")
+}
+
+enum WarrantyClaimStatus {
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+  PAID
+}
+
+/// A warranty job claimed from the OEM: its invoice is the receivable on the OEM account.
+model WarrantyClaim {
+  id           String              @id @default(cuid())
+  number       String              @unique
+  siteId       String
+  roId         String
+  jobId        String              @unique
+  brandId      String
+  invoiceId    String              @unique
+  status       WarrantyClaimStatus @default(SUBMITTED)
+  claimedCents Int
+  submittedOn  DateTime            @db.Date
+  decidedOn    DateTime?           @db.Date
+  paidOn       DateTime?           @db.Date
+  creditNoteId String?
+  notes        String?
+  site         Site                @relation(fields: [siteId], references: [id])
+  ro           RepairOrder         @relation(fields: [roId], references: [id])
+  job          RoJob               @relation(fields: [jobId], references: [id])
+  brand        Brand               @relation(fields: [brandId], references: [id])
+  invoice      Invoice             @relation("ClaimInvoice", fields: [invoiceId], references: [id])
+
+  @@index([siteId, status])
+  @@map("warranty_claim")
 }

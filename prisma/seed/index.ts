@@ -24,6 +24,7 @@ import {
 import { createUser, seedRolesAndPermissions, type RoleKey } from "@/modules/admin";
 import { composeHooks, seedAccounting } from "./accounting";
 import { partsSeeder } from "./parts";
+import { workshopSeeder } from "./workshop";
 import { salesSeeder } from "./sales";
 import { APPROVAL_RULES, BRANDS, COLOURS, SETTINGS, SITE_SETTINGS, SITES, VN_MODELS, VO_MODELS } from "./data";
 
@@ -431,7 +432,8 @@ export async function seed() {
   const vehicles = await seedVehicles(today, sites, brands, customerIds);
   const sales = salesSeeder({ today, sites, brands });
   const parts = partsSeeder({ today, sites, brands });
-  const accounting = await seedAccounting(today, sites, brands, customerIds, composeHooks(sales.hooks, parts.hooks));
+  const workshop = workshopSeeder({ today, sites, brands });
+  const accounting = await seedAccounting(today, sites, brands, customerIds, composeHooks(sales.hooks, parts.hooks, workshop.hooks));
   const counts = {
     sites: sites.size,
     users: await db.user.count(),
@@ -440,6 +442,7 @@ export async function seed() {
     ...accounting,
     sales: sales.stats,
     parts: parts.stats,
+    workshop: workshop.stats,
     seconds: Math.round((Date.now() - started) / 1000),
   };
   console.log("Seed complete", counts);

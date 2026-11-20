@@ -70,17 +70,19 @@ Each phase ends with: migrations applied, seed updated, tests green, app running
 - **Done when:** Flow 5 e2e passes → `tests/e2e/parts.spec.ts` (item raised below min → suggested order → sent → received → PMP recalculated → supplier invoice matched → paid; 373000 up by the receipt and 408100 back where it was on the trial balance; invoice entry with 408100, 445660 and 401)
 - Deferred: issues to repair orders (Phase 5), supplier returns and customer returns (movement kinds exist), parts reports (Phase 6), editing the tolerance and lead times in the UI.
 
-## Phase 5 — After-sales (workshop)
-- [ ] Labour operation catalogue (standard times), labour rates per site
-- [ ] Planner by technician and bay, capacity per day
-- [ ] RO lifecycle with check-in (mileage, fuel, damage, signature)
-- [ ] Jobs: labour, parts issue from stock, sublet, consumables; payer per job
-- [ ] Additional work estimates with customer approval
-- [ ] Clocking on/off; productivity and efficiency
-- [ ] Invoicing per payer; warranty claims → OEM receivable; internal RO → VO stock value
-- [ ] Vehicle service history
-- [ ] Tests: labour billing, efficiency, payer split; **e2e flows 2, 3, 4**
-- **Done when:** Flows 2, 3 and 4 e2e pass
+## Phase 5 — After-sales (workshop) ✅
+- [x] Labour operation catalogue (standard times), labour rates per site (customer / warranty per make / internal)
+- [x] Planner by technician and bay, capacity per day (D-060)
+- [x] RO lifecycle with check-in (mileage, fuel, damage zones, drawn signature) (D-056)
+- [x] Jobs: labour, parts issued from stock at PMP (D-057), sublet; payer per job
+- [x] Additional work estimates with customer approval
+- [x] Clocking on/off; productivity, efficiency and utilisation per technician
+- [x] Invoicing per payer; warranty claims → OEM receivable, remittance or credit note (D-058); internal RO → VO stock value (D-059)
+- [x] Vehicle service history; dashboard workshop KPIs; screens: planner, appointment, check-in, repair orders, RO, clocking, productivity, warranty claims, labour catalogue; CSV exports
+- [x] Seed: six months of workshop activity (D-061)
+- [x] Tests: rates, pricing, workflow, productivity, check-in (unit); Flow 3, payer split, rejected claim, additional work, returns and cancel, internal RO, efficiency (integration); **e2e flows 2, 3, 4**
+- **Done when:** Flows 2, 3 and 4 e2e pass → `tests/e2e/workshop.spec.ts`
+- Deferred: consumables as a flat charge (bought as parts for now), RO and claim PDFs (Phase 6), bay-level capacity, editing rates in the UI, workshop reports (Phase 6).
 
 ## Phase 6 — Reports, dashboards, PDFs
 - [ ] Trial balance, general ledger, P&L and gross margin by department, stock value, VAT report, ageing balance

@@ -416,6 +416,32 @@ export function buildPurchaseEntry(p: {
   };
 }
 
+/**
+ * Work done by one department for another (OD): the workshop "sells" its labour and parts to
+ * used-car reconditioning at the internal rate. Dr the buyer's account (one amount), Cr each
+ * internal revenue line on its department. Group-wide it nets to zero; per department it shows
+ * the workshop's internal production and the true reconditioning cost.
+ */
+export function buildInternalWorkEntry(p: {
+  siteId: string;
+  date: Date;
+  label: string;
+  sourceType: string;
+  sourceId: string | null;
+  debit: { account: AccountRef; departmentCode: DepartmentCode };
+  credits: { account: AccountRef; amountCents: Cents; departmentCode: DepartmentCode }[];
+}): EntryDraft {
+  const label = p.label.slice(0, 120);
+  if (p.credits.some((c) => !Number.isSafeInteger(c.amountCents) || c.amountCents < 0)) throw new RangeError("Amounts must be positive integer cents");
+  const total = sumCents(p.credits.map((c) => c.amountCents));
+  if (total <= 0) throw new RangeError("Internal work must have a positive value");
+  const lines: DraftLine[] = [
+    { account: p.debit.account, debitCents: total, creditCents: 0, label, departmentCode: p.debit.departmentCode },
+    ...p.credits.filter((c) => c.amountCents > 0).map((c) => ({ account: c.account, debitCents: 0, creditCents: c.amountCents, label, departmentCode: c.departmentCode })),
+  ];
+  return { journalCode: "OD", siteId: p.siteId, entryDate: p.date, label, sourceType: p.sourceType, sourceId: p.sourceId, lines: compactLines(lines) };
+}
+
 /** Reversal of a posted entry: same lines, sides swapped, new date. */
 export function buildReversal(
   original: { id: string; number: string; journalCode: string; siteId: string; lines: ResolvedLine[] },

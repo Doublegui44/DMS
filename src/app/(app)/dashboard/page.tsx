@@ -4,6 +4,7 @@ import { formatBp, formatMoney } from "@/lib/money";
 import { getCoreDashboard } from "@/modules/core";
 import { getSalesDashboard } from "@/modules/sales";
 import { getPartsDashboard } from "@/modules/parts";
+import { getWorkshopDashboard } from "@/modules/workshop";
 import { ROLE_LABELS, type RoleKey } from "@/modules/admin";
 import { PageHeader, Section } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -30,6 +31,7 @@ export default async function DashboardPage() {
   const d = await query((ctx) => getCoreDashboard(ctx), { resource: "dashboard", action: "view" });
   const sales = actor.permissions.has("sales.order:view") ? await query((ctx) => getSalesDashboard(ctx)) : null;
   const parts = actor.permissions.has("parts.stock:view") ? await query((ctx) => getPartsDashboard(ctx)) : null;
+  const workshop = actor.permissions.has("workshop.repair_order:view") ? await query((ctx) => getWorkshopDashboard(ctx)) : null;
 
   return (
     <div className="space-y-4">
@@ -62,6 +64,19 @@ export default async function DashboardPage() {
             <Kpi label={t("frontEndMtd")} value={formatMoney(sales.frontEndMtdCents, { decimals: false })} />
             <Kpi label={t("backEndMtd")} value={formatMoney(sales.backEndMtdCents, { decimals: false })} />
             <Kpi label={t("deliveredMtd")} value={sales.deliveredMtd} />
+          </div>
+        </Section>
+      )}
+      {workshop && (
+        <Section title={t("workshopTitle")}>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="workshop-kpis">
+            <Kpi label={t("workshopOpen")} value={workshop.openRos} />
+            <Kpi label={t("workshopReady")} value={workshop.readyRos} tone={workshop.readyRos > 0 ? "warn" : undefined} />
+            <Kpi label={t("workshopApprovals")} value={workshop.pendingApprovals} tone={workshop.pendingApprovals > 0 ? "warn" : undefined} />
+            <Kpi label={t("workshopAppointments")} value={workshop.appointmentsToday} />
+            <Kpi label={t("workshopInvoicedMtd")} value={workshop.invoicedMtd} sub={formatMoney(workshop.revenueMtdCents, { decimals: false })} />
+            <Kpi label={t("workshopEfficiency")} value={formatBp(workshop.efficiencyMtdBp, 1)} />
+            <Kpi label={t("workshopClaims")} value={workshop.openClaims} sub={formatMoney(workshop.openClaimsCents, { decimals: false })} />
           </div>
         </Section>
       )}

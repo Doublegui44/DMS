@@ -15,6 +15,7 @@ export const DEFAULT_SEQUENCES: Record<string, SequenceDefinition> = {
   QUOTE: { prefix: "DE", padding: 5, yearly: true },
   SALES_ORDER: { prefix: "BC", padding: 5, yearly: true },
   REPAIR_ORDER: { prefix: "OR", padding: 6, yearly: true },
+  APPOINTMENT: { prefix: "RV", padding: 6, yearly: true },
   PURCHASE_ORDER: { prefix: "CF", padding: 5, yearly: true },
   GOODS_RECEIPT: { prefix: "BR", padding: 5, yearly: true },
   COUNTER_SALE: { prefix: "VC", padding: 5, yearly: true },

@@ -8,6 +8,7 @@ import { listAuditLog, listUsers } from "@/modules/admin";
 import { listAccounts, listEntries, listInvoices, listPayments } from "@/modules/accounting";
 import { listLeads, listOrders, listPoliceRegister, listVnStock, listVoStock } from "@/modules/sales";
 import { listCounterSales, listMovements, listObsoleteStock, listParts, listPurchaseOrders, listStockItems, listSupplierInvoices } from "@/modules/parts";
+import { listLabourOperations, listRepairOrders, listWarrantyClaims } from "@/modules/workshop";
 import { isoDate } from "@/lib/dates";
 
 type Exporter = (sp: Record<string, string>) => Promise<{ rows: Record<string, unknown>[]; columns: { key: string; header: string }[] }>;
@@ -579,6 +580,78 @@ const EXPORTERS: Record<string, Exporter> = {
         { key: "totalExcl", header: "Total excl. VAT" },
         { key: "cost", header: "Cost" },
         { key: "invoice", header: "Invoice" },
+      ],
+    };
+  },
+  async "repair-orders"(sp) {
+    const { rows } = await query((ctx) => listRepairOrders(ctx, parseListParams(sp, { sort: "openedOn", dir: "desc" }), { all: true }));
+    return {
+      rows: rows.map((r) => ({
+        number: r.number,
+        openedOn: isoDate(r.openedOn),
+        site: r.site.code,
+        kind: r.kind,
+        customer: r.customer?.displayName ?? "",
+        vehicle: `${r.vehicle.make} ${r.vehicle.model}`,
+        registration: r.vehicle.registration ?? r.vehicle.vin,
+        status: r.status,
+        jobs: r._count.jobs,
+        totalExcl: centsToCsv(r.totalExclVatCents),
+        invoicedOn: isoDate(r.invoicedOn),
+      })),
+      columns: [
+        { key: "number", header: "Number" },
+        { key: "openedOn", header: "Opened" },
+        { key: "site", header: "Site" },
+        { key: "kind", header: "Kind" },
+        { key: "customer", header: "Customer" },
+        { key: "vehicle", header: "Vehicle" },
+        { key: "registration", header: "Registration" },
+        { key: "status", header: "Status" },
+        { key: "jobs", header: "Jobs" },
+        { key: "totalExcl", header: "Total excl. VAT" },
+        { key: "invoicedOn", header: "Invoiced" },
+      ],
+    };
+  },
+  async "warranty-claims"(sp) {
+    const { rows } = await query((ctx) => listWarrantyClaims(ctx, parseListParams(sp, { sort: "submittedOn", dir: "desc" }), { all: true }));
+    return {
+      rows: rows.map((c) => ({
+        number: c.number,
+        submittedOn: isoDate(c.submittedOn),
+        site: c.site.code,
+        brand: c.brand.name,
+        ro: c.ro.number,
+        job: c.job.description,
+        invoice: c.invoice.number,
+        claimed: centsToCsv(c.claimedCents),
+        status: c.status,
+      })),
+      columns: [
+        { key: "number", header: "Number" },
+        { key: "submittedOn", header: "Submitted" },
+        { key: "site", header: "Site" },
+        { key: "brand", header: "Make" },
+        { key: "ro", header: "Repair order" },
+        { key: "job", header: "Job" },
+        { key: "invoice", header: "Invoice" },
+        { key: "claimed", header: "Claimed incl. VAT" },
+        { key: "status", header: "Status" },
+      ],
+    };
+  },
+  async "labour-operations"(sp) {
+    const { rows } = await query((ctx) => listLabourOperations(ctx, parseListParams(sp, { sort: "code", dir: "asc" }), { all: true }));
+    return {
+      rows: rows.map((o) => ({ code: o.code, label: o.label, category: o.category, brand: o.brand?.name ?? "", hours: (o.standardCentiHours / 100).toFixed(2), active: o.active ? "yes" : "no" })),
+      columns: [
+        { key: "code", header: "Code" },
+        { key: "label", header: "Label" },
+        { key: "category", header: "Category" },
+        { key: "brand", header: "Make" },
+        { key: "hours", header: "Standard hours" },
+        { key: "active", header: "Active" },
       ],
     };
   },

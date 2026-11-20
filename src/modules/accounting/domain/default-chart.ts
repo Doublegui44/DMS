@@ -133,6 +133,7 @@ export const DEFAULT_MAPPINGS: Record<string, string> = {
   PURCHASE_ACCESSORY: "607400",
   PURCHASE_ADDON: "604100",
   PURCHASE_RECONDITIONING: "604000",
+  PURCHASE_SUBLET: "604000", // work bought from another garage for a repair order
   STOCK_VN: "371000",
   STOCK_VO: "372000",
   STOCK_PARTS: "373000",

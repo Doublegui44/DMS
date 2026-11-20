@@ -10,7 +10,6 @@ import { runCommand, SYSTEM_ACTOR, type ServiceContext } from "@/lib/context";
 import { addDays } from "@/lib/dates";
 import { createSupplier } from "@/modules/core";
 import {
-  createAndIssueInvoice,
   ensurePeriods,
   installDefaultChart,
   lockPeriod,
@@ -18,7 +17,6 @@ import {
   postOpeningBalances,
   recordPayment,
   periodOf,
-  type InvoiceInput,
 } from "@/modules/accounting";
 import { BRANDS, SITES } from "./data";
 
@@ -27,15 +25,6 @@ const sys = <T>(fn: (ctx: ServiceContext) => Promise<T>, businessDate?: Date) =>
 
 const firstOfMonth = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
 const monthsBack = (d: Date, n: number) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - n, 1));
-
-const WORKSHOP_JOBS = [
-  { label: "Annual service — labour", hours: 1.2, parts: [{ label: "Oil filter", cents: 1_450 }, { label: "Engine oil 5W30 (5 L)", cents: 5_490 }] },
-  { label: "Front brake pads replacement — labour", hours: 1.0, parts: [{ label: "Brake pad set", cents: 6_890 }] },
-  { label: "Timing belt kit — labour", hours: 3.5, parts: [{ label: "Timing belt kit", cents: 24_900 }, { label: "Water pump", cents: 8_950 }] },
-  { label: "Tyre fitting x2 — labour", hours: 0.6, parts: [{ label: "Tyre 205/55 R16", cents: 9_800 }, { label: "Tyre 205/55 R16", cents: 9_800 }] },
-  { label: "Air-conditioning recharge — labour", hours: 0.8, parts: [{ label: "Refrigerant R1234yf", cents: 4_500 }] },
-  { label: "Diagnostic — labour", hours: 0.5, parts: [] },
-];
 
 /** Other modules' history, run inside the accounting one so document numbers stay chronological. */
 export interface HistoryHooks {
@@ -123,15 +112,9 @@ export async function seedAccounting(
 
   await hooks.before?.(opening);
 
-  // Six months of activity, day by day: workshop/parts invoices, warranty claims, receipts, overheads.
-  const individuals = await db.customer.findMany({ where: { id: { in: customerIds } }, select: { id: true, homeSiteId: true, kind: true } });
-  const oemCustomers = await db.brand.findMany({ select: { code: true, oemCustomerId: true } });
-  let invoices = 0;
-  let payments = 0;
-  const unpaidCompany: { id: string; siteId: string; customerId: string; total: number; due: Date }[] = [];
+  // Six months of overheads, day by day; the modules' hooks add their own activity each day.
 
   for (let day = opening; day < today; day = addDays(day, 1)) {
-    const weekday = day.getUTCDay();
     const monthStart = day.getUTCDate() === 1;
     for (const s of SITES) {
       const siteId = sites.get(s.code)!;
@@ -149,7 +132,6 @@ export async function seedAccounting(
           }),
         day);
         await sys((ctx) => recordPayment(ctx, { siteId, direction: "OUT", method: "TRANSFER", supplierId: landlord.id, amountCents: 400_000, reference: "Rent" }), day);
-        payments++;
       }
       if (day.getUTCDate() === 28) {
         const lines = [
@@ -173,63 +155,6 @@ export async function seedAccounting(
           }),
         day);
       }
-      if (weekday === 0) continue; // closed on Sundays
-      const count = faker.number.int({ min: 0, max: weekday === 6 ? 1 : 3 });
-      for (let i = 0; i < count; i++) {
-        const local = individuals.filter((c) => c.homeSiteId === siteId);
-        const customer = faker.helpers.arrayElement(local.length ? local : individuals);
-        const job = faker.helpers.arrayElement(WORKSHOP_JOBS);
-        const input: InvoiceInput = {
-          siteId,
-          customerId: customer.id,
-          lines: [
-            { label: job.label, quantity: job.hours, unitPriceExclVatCents: s.labourRateCents, departmentCode: "WORKSHOP", revenueKey: "REVENUE_LABOUR" },
-            ...job.parts.map((p) => ({ label: p.label, quantity: 1, unitPriceExclVatCents: p.cents, departmentCode: "PARTS" as const, revenueKey: "REVENUE_PARTS" })),
-          ],
-        };
-        const inv = await sys((ctx) => createAndIssueInvoice(ctx, input), day);
-        invoices++;
-        if (customer.kind === "COMPANY") {
-          unpaidCompany.push({ id: inv.id, siteId, customerId: customer.id, total: inv.totalInclVatCents, due: inv.dueDate! });
-        } else if (faker.datatype.boolean(0.97)) {
-          const method = faker.helpers.weightedArrayElement([
-            { value: "CARD" as const, weight: 7 },
-            { value: "CHEQUE" as const, weight: 1 },
-            { value: "CASH" as const, weight: 1 },
-            { value: "TRANSFER" as const, weight: 1 },
-          ]);
-          await sys((ctx) => recordPayment(ctx, { siteId, method, customerId: customer.id, amountCents: inv.totalInclVatCents, allocations: [{ invoiceId: inv.id, amountCents: inv.totalInclVatCents }] }), day);
-          payments++;
-        }
-      }
-      // A warranty claim to the OEM about once a week per site.
-      if (weekday === 3) {
-        const brandCode = faker.helpers.arrayElement(s.brands);
-        const oem = oemCustomers.find((b) => b.code === brandCode)!.oemCustomerId!;
-        const inv = await sys(
-          (ctx) =>
-            createAndIssueInvoice(ctx, {
-              siteId,
-              customerId: oem,
-              sourceType: "WARRANTY_CLAIM",
-              lines: [
-                { label: "Warranty labour", quantity: faker.number.float({ min: 0.5, max: 4, fractionDigits: 1 }), unitPriceExclVatCents: 8_000, departmentCode: "WORKSHOP", revenueKey: "REVENUE_WARRANTY_LABOUR" },
-                { label: "Warranty parts", quantity: 1, unitPriceExclVatCents: faker.number.int({ min: 3_000, max: 60_000 }), departmentCode: "PARTS", revenueKey: "REVENUE_WARRANTY_PARTS" },
-              ],
-            }),
-          day,
-        );
-        invoices++;
-        unpaidCompany.push({ id: inv.id, siteId, customerId: oem, total: inv.totalInclVatCents, due: inv.dueDate! });
-      }
-    }
-    // Companies and OEMs pay by transfer around their due date (most of them).
-    const dueToday = unpaidCompany.filter((u) => u.due.getTime() <= day.getTime());
-    for (const u of dueToday) {
-      unpaidCompany.splice(unpaidCompany.indexOf(u), 1);
-      if (!faker.datatype.boolean(0.85)) continue; // some stay overdue for the demo
-      await sys((ctx) => recordPayment(ctx, { siteId: u.siteId, method: "TRANSFER", customerId: u.customerId, amountCents: u.total, allocations: [{ invoiceId: u.id, amountCents: u.total }] }), day);
-      payments++;
     }
     await hooks.day?.(day);
   }
@@ -243,5 +168,5 @@ export async function seedAccounting(
     if (p.startDate < firstOfMonth(opening)) continue;
     await sys((ctx) => lockPeriod(ctx, p.id), today);
   }
-  return { invoices, payments, entries: await db.journalEntry.count() };
+  return { invoices: await db.invoice.count(), payments: await db.payment.count(), entries: await db.journalEntry.count() };
 }

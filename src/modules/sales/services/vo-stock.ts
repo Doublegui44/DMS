@@ -182,6 +182,31 @@ export async function addVehicleCost(ctx: ServiceContext, vehicleId: string, inp
   return line;
 }
 
+/**
+ * The workshop's internal repair order on a used car: its value (at internal rates) is added to
+ * the car's stock value. The workshop posts its internal sale; this records the cost line and
+ * moves the stock (Dr 372000 / Cr 603720). Only the workshop flow may call it.
+ */
+export async function capitaliseRepairOrder(
+  ctx: ServiceContext,
+  a: { vehicleId: string; roId: string; amountCents: number; label: string },
+  opts: { trusted?: boolean } = {},
+) {
+  if (!opts.trusted) throw new ConflictError("Repair order costs are added by the workshop only");
+  const v = await ctx.tx.vehicle.findUnique({ where: { id: a.vehicleId } });
+  if (!v) throw new NotFoundError("Vehicle", a.vehicleId);
+  if (v.stockType !== "VO" || !["INTAKE", "RECONDITIONING", "FOR_SALE", "RESERVED"].includes(v.status)) {
+    throw new ConflictError("Internal repair orders are for used cars in stock only");
+  }
+  const line = await ctx.tx.vehicleCostLine.create({
+    data: { vehicleId: v.id, kind: "RECONDITIONING", label: a.label.slice(0, 120), amountCents: a.amountCents, sourceType: "REPAIR_ORDER", sourceId: a.roId, businessDate: ctx.businessDate, createdById: ctx.actor.userId },
+  });
+  await moveVehicleStock(ctx, { vehicleId: v.id, movement: "COST", amountCents: a.amountCents, label: `${a.label} — ${vehicleLabel(v)}`, sourceType: "REPAIR_ORDER", sourceId: a.roId });
+  await ctx.audit({ action: "vehicle.cost", entityType: "Vehicle", entityId: v.id, siteId: v.siteId, after: line });
+  await ctx.emit({ type: "VehicleCostAdded", aggregateType: "Vehicle", aggregateId: v.id, siteId: v.siteId, payload: { vehicleId: v.id, costLineId: line.id, amountCents: line.amountCents } });
+  return line;
+}
+
 export async function startReconditioning(ctx: ServiceContext, vehicleId: string) {
   const v = await stockVo(ctx, vehicleId);
   if (v.status !== "INTAKE" && v.status !== "FOR_SALE") throw new ConflictError(`A car ${v.status.toLowerCase()} cannot go to reconditioning`);

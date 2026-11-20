@@ -626,6 +626,8 @@ erDiagram
 
 ### 6.4 Workshop (after-sales)
 
+> **As built (Phase 5):** the check-in record (mileage, fuel, damage zones, signature) lives on `RepairOrder` itself. Technician capacity is a `Technician` row per technician user. Bays are `WorkshopBay` rows per site. Lines are `RoLabourLine`, `RoPartLine` and `RoSubletLine`, and time is recorded in `Clocking`. Posting and payer rules are in D-056 to D-060.
+
 ```mermaid
 erDiagram
   Site ||--o{ Bay : has

@@ -29,6 +29,7 @@ export {
 export { createCycleCount, recordCounts, postCycleCount, cancelCycleCount } from "./services/inventory";
 export { registerOpeningStock, type OpeningStockItem } from "./services/opening";
 export { partsSettings, type PartsSettings } from "./services/shared";
+export { pricePartForWorkshop, issuePartsToRepairOrder, returnPartsFromRepairOrder } from "./services/workshop";
 export { listParts, getPart, getPartFormData, getDiscountMatrix, PART_SORTS } from "./queries/catalogue";
 export {
   listStockItems,

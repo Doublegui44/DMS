@@ -40,10 +40,12 @@ export const NAV: NavGroup[] = [
   {
     key: "workshop",
     items: [
-      { key: "planner", href: "/workshop/planner", resource: "workshop.appointment", icon: "CalendarDays", phase: 5 },
-      { key: "repairOrders", href: "/workshop/repair-orders", resource: "workshop.repair_order", icon: "Wrench", phase: 5 },
-      { key: "clocking", href: "/workshop/clocking", resource: "workshop.clocking", icon: "Timer", phase: 5 },
-      { key: "warranty", href: "/workshop/warranty", resource: "workshop.warranty", icon: "ShieldCheck", phase: 5 },
+      { key: "planner", href: "/workshop/planner", resource: "workshop.appointment", icon: "CalendarDays" },
+      { key: "repairOrders", href: "/workshop/repair-orders", resource: "workshop.repair_order", icon: "Wrench" },
+      { key: "clocking", href: "/workshop/clocking", resource: "workshop.clocking", icon: "Timer" },
+      { key: "productivity", href: "/workshop/productivity", resource: "workshop.clocking", icon: "Gauge" },
+      { key: "warranty", href: "/workshop/warranty", resource: "workshop.warranty", icon: "ShieldCheck" },
+      { key: "labourCatalogue", href: "/workshop/labour-operations", resource: "workshop.labour_catalogue", icon: "ListChecks" },
     ],
   },
   {
