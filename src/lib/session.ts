@@ -2,6 +2,8 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+// Registers every module's domain-event handlers before any command runs (D-031).
+import "@/modules/register";
 import { db } from "./db";
 import { loadActor } from "./actor";
 import { runCommand, runQuery, type Actor, type CommandOptions, type ServiceContext } from "./context";

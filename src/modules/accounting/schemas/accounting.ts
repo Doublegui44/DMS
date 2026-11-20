@@ -56,6 +56,8 @@ const invoiceLineSchema = z.object({
   revenueKey: z.string().min(1),
   /** Margin regime only: purchase price of the used vehicle (price is then incl. VAT). */
   purchasePriceCents: z.coerce.number().int().min(0).optional(),
+  /** Per-line regime; defaults to the invoice's. A used car (MARGIN) can share an invoice with add-ons (STANDARD). */
+  vatRegime: z.enum(["STANDARD", "MARGIN"]).optional(),
 });
 
 export const invoiceInputSchema = z.object({
@@ -73,11 +75,14 @@ export const paymentInputSchema = z
   .object({
     siteId: z.string().min(1),
     direction: z.enum(["IN", "OUT"]).default("IN"),
-    method: z.enum(["TRANSFER", "CARD", "CHEQUE", "CASH", "FINANCE_COMPANY"]),
+    method: z.enum(["TRANSFER", "CARD", "CHEQUE", "CASH", "FINANCE_COMPANY", "TRADE_IN"]),
     customerId: optionalText,
     supplierId: optionalText,
     amountCents: z.coerce.number().int().positive("Amount must be positive"),
     reference: optionalText,
+    /** Business document the money was taken for before any invoice exists (e.g. a deposit on an order). */
+    sourceType: optionalText,
+    sourceId: optionalText,
     allocations: z
       .array(z.object({ invoiceId: z.string().min(1), amountCents: z.coerce.number().int().positive() }))
       .default([]),

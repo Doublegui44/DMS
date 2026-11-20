@@ -9,7 +9,7 @@ export type Action = (typeof ACTIONS)[number];
 /** Catalogue of permission resources, grouped by module (drives the permission matrix UI). */
 export const RESOURCES = {
   core: ["dashboard", "customer", "vehicle"],
-  sales: ["sales.lead", "sales.quote", "sales.order", "sales.trade_in", "sales.vo_stock", "sales.catalogue"],
+  sales: ["sales.lead", "sales.quote", "sales.order", "sales.trade_in", "sales.vn_stock", "sales.vo_stock", "sales.catalogue"],
   workshop: [
     "workshop.appointment",
     "workshop.repair_order",

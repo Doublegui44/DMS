@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { runCommand } from "@/lib/context";
-import { clearHandlers } from "@/lib/events";
 import { DomainError, ForbiddenError } from "@/lib/errors";
 import { createCustomer, createSupplier } from "@/modules/core";
 import {
@@ -20,13 +19,13 @@ import {
   reverseEntry,
   setAccountMapping,
 } from "@/modules/accounting";
-import { db, makeActor, resetWithAccounting, sys } from "./helpers";
+import { db, makeActor, resetHandlers, resetWithAccounting, sys } from "./helpers";
 
 let org: Awaited<ReturnType<typeof resetWithAccounting>>;
 let customerId: string;
 
 beforeEach(async () => {
-  clearHandlers();
+  resetHandlers();
   org = await resetWithAccounting();
   const c = await sys((ctx) => createCustomer(ctx, { kind: "INDIVIDUAL", firstName: "Jeanne", lastName: "Martin", homeSiteId: org.siteA.id }));
   customerId = c.id;

@@ -86,15 +86,19 @@ test.describe("core workflows", () => {
     await expect(page.getByText("Customer created", { exact: true })).toBeVisible(); // timeline event
   });
 
-  test("an admin moves a VN from in transit to in stock", async ({ page }) => {
+  test("a VN in transit enters stock through its arrival in sales, never by hand", async ({ page }) => {
     await login(page, USERS.ADMIN);
     await page.goto("/vehicles?stockType=VN&status=IN_TRANSIT");
     await page.getByTestId("table-row").first().getByRole("link").first().click();
     await expect(page.locator("[data-status=IN_TRANSIT]").first()).toBeVisible();
-    await page.locator("select[name=status]").selectOption("IN_STOCK");
-    await page.getByRole("button", { name: "Change status" }).click();
-    await expect(page.locator("h1 + [data-status=IN_STOCK], [data-status=IN_STOCK]").first()).toBeVisible();
-    await expect(page.getByText("Vehicle status changed")).toBeVisible();
+    // The vehicle record has no manual status change (D-048): it sends the user to the sales flow.
+    await expect(page.getByRole("button", { name: "Change status" })).toHaveCount(0);
+    await page.getByRole("link", { name: "Open in sales" }).click();
+    await expect(page).toHaveURL(/\/sales\/vn-stock\/[a-z0-9]+$/);
+    await expect(page.getByTestId("receive-cost")).not.toHaveValue("");
+    await page.getByRole("button", { name: "Receive in stock" }).click();
+    await expect(page.locator("[data-status=IN_STOCK]").first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Arrived from the manufacturer").first()).toBeVisible();
   });
 
   test("the demo role switcher changes the signed-in user", async ({ page }) => {

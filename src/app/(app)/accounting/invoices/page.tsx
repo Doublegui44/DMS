@@ -37,7 +37,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
           ...(overdue ? [{ status: "overdue", label: t("overdue") }] : []),
         ],
       },
-      source: i.sourceType,
+      source: i.sourceType && t.has(`sources.${i.sourceType}`) ? t(`sources.${i.sourceType}`) : i.sourceType,
       site: i.site.code,
     };
   });

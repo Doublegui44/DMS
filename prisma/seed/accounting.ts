@@ -37,7 +37,23 @@ const WORKSHOP_JOBS = [
   { label: "Diagnostic — labour", hours: 0.5, parts: [] },
 ];
 
-export async function seedAccounting(today: Date, sites: Map<string, string>, brands: Map<string, string>, customerIds: string[]) {
+/** Other modules' history, run inside the accounting one so document numbers stay chronological. */
+export interface HistoryHooks {
+  /** After the opening balances, before the first day. */
+  before?: (opening: Date) => Promise<void>;
+  /** At the end of each day of history. */
+  day?: (day: Date) => Promise<void>;
+  /** After the last day, before the months are locked. */
+  after?: () => Promise<void>;
+}
+
+export async function seedAccounting(
+  today: Date,
+  sites: Map<string, string>,
+  brands: Map<string, string>,
+  customerIds: string[],
+  hooks: HistoryHooks = {},
+) {
   await sys((ctx) => installDefaultChart(ctx));
   const opening = monthsBack(today, 6);
   await sys((ctx) => ensurePeriods(ctx.tx, opening, new Date(Date.UTC(today.getUTCFullYear(), 11, 31))));
@@ -52,10 +68,15 @@ export async function seedAccounting(today: Date, sites: Map<string, string>, br
     await sys((ctx) => createSupplier(ctx, { name, paymentTermsDays: 30, city: faker.location.city() }));
   }
 
-  // Opening balances per site: stock sub-ledgers (perpetual inventory), bank, capital.
+  // Opening balances per site: stock sub-ledgers (perpetual inventory), bank, capital. Only the cars
+  // held when the books are opened: later arrivals are booked on their stock-in date (sales seed).
   const stock = await db.vehicle.groupBy({
     by: ["siteId", "stockType"],
-    where: { stockType: { in: ["VN", "VO"] }, status: { in: ["IN_STOCK", "RESERVED", "INTAKE", "RECONDITIONING", "FOR_SALE"] } },
+    where: {
+      stockType: { in: ["VN", "VO"] },
+      status: { in: ["IN_STOCK", "RESERVED", "INTAKE", "RECONDITIONING", "FOR_SALE"] },
+      stockInDate: { lte: opening },
+    },
     _sum: { stockValueCents: true },
   });
   for (const s of SITES) {
@@ -69,12 +90,14 @@ export async function seedAccounting(today: Date, sites: Map<string, string>, br
           { account: { key: "STOCK_VN" }, amountCents: v("VN"), label: "VN stock at opening" },
           { account: { key: "STOCK_VO" }, amountCents: v("VO"), label: "VO stock at opening" },
           { account: { code: "512100" }, amountCents: 35_000_000, label: "Bank at opening" },
-          { account: { key: "CAPITAL" }, amountCents: -50_000_000, label: "Share capital" },
+          { account: { key: "CAPITAL" }, amountCents: -30_000_000, label: "Share capital" },
         ],
         balancingAccount: { code: "110000" },
       }),
     );
   }
+
+  await hooks.before?.(opening);
 
   // Six months of activity, day by day: workshop/parts invoices, warranty claims, receipts, overheads.
   const individuals = await db.customer.findMany({ where: { id: { in: customerIds } }, select: { id: true, homeSiteId: true, kind: true } });
@@ -184,7 +207,9 @@ export async function seedAccounting(today: Date, sites: Map<string, string>, br
       await sys((ctx) => recordPayment(ctx, { siteId: u.siteId, method: "TRANSFER", customerId: u.customerId, amountCents: u.total, allocations: [{ invoiceId: u.id, amountCents: u.total }] }), day);
       payments++;
     }
+    await hooks.day?.(day);
   }
+  await hooks.after?.();
 
   // Close every month except the last finished one (left open to demo the month-end close).
   const lastFinished = periodOf(monthsBack(today, 1));

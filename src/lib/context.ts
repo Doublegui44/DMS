@@ -5,7 +5,7 @@
 import type { Prisma } from "@prisma/client";
 import { db, type Tx } from "./db";
 import { ForbiddenError } from "./errors";
-import { handlersFor, type DomainEventEnvelope, type EventType } from "./events";
+import { handlersFor, handlersRegistered, type DomainEventEnvelope, type EventType } from "./events";
 import { can, type Action, type PermissionSet } from "./rbac";
 import { toDateOnly, localToday } from "./dates";
 
@@ -116,6 +116,10 @@ function buildContext(tx: Tx, opts: CommandOptions, businessDate: Date): Service
 
 /** Run a mutation in a transaction with permission check, audit and events. */
 export async function runCommand<T>(opts: CommandOptions, fn: (ctx: ServiceContext) => Promise<T>): Promise<T> {
+  // Without the cross-module handlers, postings (e.g. stock entries) would silently be skipped.
+  if (!handlersRegistered()) {
+    throw new Error('Domain event handlers are not registered: import "@/modules/register" in this entry point');
+  }
   return db.$transaction(
     async (tx) => {
       const businessDate = opts.businessDate ? toDateOnly(opts.businessDate) : await readBusinessDate(tx);

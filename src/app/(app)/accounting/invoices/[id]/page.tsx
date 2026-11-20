@@ -155,7 +155,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               { label: t("issueDate"), value: formatDate(inv.issueDate) },
               { label: t("dueDate"), value: formatDate(inv.dueDate) },
               { label: t("vatRegime"), value: t(`regimes.${inv.vatRegime}`) },
-              { label: t("source"), value: inv.sourceType },
+              { label: t("source"), value: inv.sourceType && t.has(`sources.${inv.sourceType}`) ? t(`sources.${inv.sourceType}`) : inv.sourceType },
               { label: t("journalEntry"), value: inv.entry ? <Link className="text-primary hover:underline" href={`/accounting/entries/${inv.entry.id}`}>{inv.entry.number}</Link> : null },
               ...(inv.creditedInvoice ? [{ label: t("creditedInvoice"), value: <Link className="text-primary hover:underline" href={`/accounting/invoices/${inv.creditedInvoice.id}`}>{inv.creditedInvoice.number}</Link> }] : []),
               ...inv.creditNotes.map((c) => ({ label: t("creditNote"), value: <Link className="text-primary hover:underline" href={`/accounting/invoices/${c.id}`}>{c.number}</Link> })),

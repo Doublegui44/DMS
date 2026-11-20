@@ -1,4 +1,5 @@
 /** Static reference data for the seed. Prices are illustrative, not real OEM list prices. */
+import { DEFAULT_ECO_BONUS, DEFAULT_ECO_MALUS, DEFAULT_FINANCING, DEFAULT_REGISTRATION_FEE } from "@/modules/sales";
 
 export const SITES = [
   {
@@ -208,6 +209,11 @@ export const APPROVAL_RULES = [
 /** Group-wide settings (business assumptions). Values are editable in Admin → Settings later. */
 export const SETTINGS: Record<string, unknown> = {
   "sales.reservationDays": 7,
+  "sales.quoteValidityDays": 15,
+  "sales.financing": DEFAULT_FINANCING,
+  "sales.registrationFee": DEFAULT_REGISTRATION_FEE,
+  "sales.ecoMalus": DEFAULT_ECO_MALUS,
+  "sales.ecoBonus": DEFAULT_ECO_BONUS,
   "sales.stockAgeingThresholdsDays": [60, 90, 120],
   "sales.commission": { frontEndMarginBp: 1000, perAddOnCents: 5000, financeCommissionBp: 2000 },
   "workshop.labourRates": { customerCents: 9500, warrantyCents: 8000, internalCents: 6000 },
@@ -218,3 +224,51 @@ export const SETTINGS: Record<string, unknown> = {
   "parts.allowNegativeStock": false,
   "locale.default": "fr-FR",
 };
+
+/** Site overrides of group settings (partial objects are merged over the group value). */
+export const SITE_SETTINGS: { site: string; key: string; value: unknown }[] = [
+  // Brittany's regional tax per fiscal horsepower is higher than Pays de la Loire's (illustrative).
+  { site: "REN", key: "sales.registrationFee", value: { perFiscalHpCents: 6_000 } },
+];
+
+/** Factory options offered on every catalogue version (excl. VAT; dealer cost = 75 %). */
+export const OPTION_TEMPLATES = [
+  { code: "PAINT-MET", label: "Metallic paint", kind: "PAINT", priceEuros: 500 },
+  { code: "PAINT-PRL", label: "Pearlescent paint", kind: "PAINT", priceEuros: 800 },
+  { code: "PACK-SAFE", label: "Safety pack (adaptive cruise, blind spot)", kind: "PACK", priceEuros: 650 },
+  { code: "PACK-WINTER", label: "Winter pack (heated seats and wheel)", kind: "PACK", priceEuros: 400 },
+  { code: "EQ-ROOF", label: "Panoramic glass roof", kind: "EQUIPMENT", priceEuros: 900 },
+  { code: "EQ-HIFI", label: "Premium hi-fi", kind: "EQUIPMENT", priceEuros: 550 },
+] as const;
+
+/** Warranty extensions and maintenance contracts sold with vehicles (back-end margin). */
+export const ADD_ONS = [
+  { code: "WAR24", kind: "WARRANTY", name: "Extended warranty 24 months", months: 24, priceEuros: 590, costEuros: 320 },
+  { code: "WAR36", kind: "WARRANTY", name: "Extended warranty 36 months", months: 36, priceEuros: 890, costEuros: 480 },
+  { code: "MNT36", kind: "MAINTENANCE", name: "Maintenance contract 36 months", months: 36, priceEuros: 790, costEuros: 520 },
+  { code: "MNT48", kind: "MAINTENANCE", name: "Maintenance contract 48 months", months: 48, priceEuros: 1_090, costEuros: 720 },
+] as const;
+
+/** Dealer-fitted accessories (excl. VAT). */
+export const ACCESSORIES = [
+  { label: "Floor mats", priceEuros: 90, costEuros: 45 },
+  { label: "Towbar (fitted)", priceEuros: 650, costEuros: 420 },
+  { label: "Roof bars", priceEuros: 220, costEuros: 130 },
+  { label: "Boot liner", priceEuros: 75, costEuros: 35 },
+  { label: "Winter tyres set", priceEuros: 780, costEuros: 560 },
+] as const;
+
+/** Where used cars are bought besides trade-ins. */
+export const VO_SUPPLIERS = [
+  { name: "Enchères Auto Ouest", city: "Nantes", vatRegime: "MARGIN" as const },
+  { name: "Loueur Atlantique LLD", city: "Rennes", vatRegime: "STANDARD" as const },
+];
+
+export const LOST_REASONS = [
+  "Bought elsewhere (better price)",
+  "Project postponed",
+  "Financing refused",
+  "Vehicle not available in time",
+  "No answer after follow-ups",
+  "Kept their current car",
+];

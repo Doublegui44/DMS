@@ -1,15 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { ActionForm, Field, NativeSelect, TextInput, type FormState } from "@/components/shared/form";
 
 const FUELS = ["PETROL", "DIESEL", "HYBRID", "PLUGIN_HYBRID", "ELECTRIC", "LPG"] as const;
-const INITIAL: Record<string, string[]> = {
-  VN: ["ORDERED", "IN_TRANSIT", "IN_STOCK"],
-  VO: ["INTAKE", "RECONDITIONING", "FOR_SALE"],
-  NONE: ["CUSTOMER"],
-};
 
 export interface VehicleFormValues {
   vin?: string;
@@ -30,10 +25,13 @@ export interface VehicleFormValues {
   ownerCustomerId?: string | null;
   listPriceEuros?: string;
   stockValueEuros?: string;
-  stockInDate?: string | null;
   vatRegime?: string;
 }
 
+/**
+ * Creates a customer's car, or edits any car. Stock cars enter through sales (factory order, purchase,
+ * trade-in), and their site, brand, owner, price and VAT regime are shown read-only here (D-048).
+ */
 export function VehicleForm({
   action,
   initial,
@@ -43,6 +41,7 @@ export function VehicleForm({
   isEdit,
   submitLabel,
   cancelHref,
+  stockLinks,
 }: {
   action: (state: FormState, fd: FormData) => Promise<FormState>;
   initial: VehicleFormValues;
@@ -52,16 +51,20 @@ export function VehicleForm({
   isEdit: boolean;
   submitLabel: string;
   cancelHref: string;
+  /** New car only: the sales screens this user may open to bring a car into stock. */
+  stockLinks?: { vn: boolean; vo: boolean };
 }) {
   const t = useTranslations("vehicle");
-  const [stockType, setStockType] = useState(initial.stockType ?? "VN");
-  const inStock = stockType !== "NONE";
+  const ts = useTranslations("sales");
+  const stockType = isEdit ? (initial.stockType ?? "NONE") : "NONE";
+  const status = isEdit ? (initial.status ?? "CUSTOMER") : "CUSTOMER";
+  const stockCar = stockType !== "NONE";
 
   return (
     <ActionForm action={action} submitLabel={submitLabel} cancelHref={cancelHref} successMessage="Saved">
       {(e) => (
         <div className="grid gap-6 lg:grid-cols-2">
-          <fieldset className="space-y-3 rounded-lg border bg-card p-4">
+          <fieldset className="min-w-0 space-y-3 rounded-lg border bg-card p-4">
             <legend className="px-1 text-sm font-semibold">Identification</legend>
             <div className="grid grid-cols-[1fr_160px] gap-3">
               <Field label={t("vin")} name="vin" error={e.vin}>
@@ -73,7 +76,13 @@ export function VehicleForm({
             </div>
             <div className="grid grid-cols-2 gap-3">
               <Field label={t("brand")} name="brandId" error={e.brandId}>
-                <NativeSelect name="brandId" defaultValue={initial.brandId} placeholder="— (other make)" options={brands.map((b) => ({ value: b.id, label: b.name }))} />
+                <NativeSelect
+                  name="brandId"
+                  defaultValue={initial.brandId}
+                  placeholder="— (other make)"
+                  disabled={stockCar}
+                  options={brands.map((b) => ({ value: b.id, label: b.name }))}
+                />
               </Field>
               <Field label={t("make")} name="make" error={e.make}>
                 <TextInput name="make" defaultValue={initial.make} invalid={!!e.make} />
@@ -105,69 +114,71 @@ export function VehicleForm({
             </div>
           </fieldset>
 
-          <fieldset className="space-y-3 rounded-lg border bg-card p-4">
-            <legend className="px-1 text-sm font-semibold">{t("stockType")}</legend>
+          <fieldset className="min-w-0 space-y-3 rounded-lg border bg-card p-4">
+            <legend className="px-1 text-sm font-semibold">{isEdit ? t("stockType") : t("owner")}</legend>
+            <input type="hidden" name="stockType" value={stockType} />
+            <input type="hidden" name="status" value={status} />
             <div className="grid grid-cols-2 gap-3">
-              <Field label={t("stockType")} name="stockType" error={e.stockType}>
+              {isEdit && (
+                <>
+                  <Field label={t("stockType")} name="stockTypeLabel" error={e.stockType}>
+                    <TextInput name="stockTypeLabel" disabled defaultValue={t(`stockTypes.${stockType}`)} />
+                  </Field>
+                  <Field label={t("status")} name="statusLabel" error={e.status}>
+                    <TextInput name="statusLabel" disabled defaultValue={t(`statuses.${status}`)} />
+                  </Field>
+                </>
+              )}
+              <Field label={t("owner")} name="ownerCustomerId" error={e.ownerCustomerId}>
                 <NativeSelect
-                  name="stockType"
-                  defaultValue={stockType}
-                  disabled={isEdit}
-                  onChange={(ev) => setStockType(ev.target.value as typeof stockType)}
-                  options={(["VN", "VO", "NONE"] as const).map((s) => ({ value: s, label: t(`stockTypes.${s}`) }))}
+                  name="ownerCustomerId"
+                  defaultValue={initial.ownerCustomerId}
+                  placeholder="—"
+                  disabled={stockCar}
+                  options={customers.map((c) => ({ value: c.id, label: c.label }))}
                 />
-                {isEdit && <input type="hidden" name="stockType" value={stockType} />}
-              </Field>
-              <Field label={t("status")} name="status" error={e.status}>
-                {isEdit ? (
-                  <>
-                    <TextInput name="statusLabel" disabled defaultValue={t(`statuses.${initial.status}`)} />
-                    <input type="hidden" name="status" value={initial.status} />
-                  </>
-                ) : (
-                  <NativeSelect
-                    key={stockType}
-                    name="status"
-                    defaultValue={INITIAL[stockType].includes(initial.status ?? "") ? initial.status : INITIAL[stockType][0]}
-                    options={INITIAL[stockType].map((s) => ({ value: s, label: t(`statuses.${s}`) }))}
-                  />
-                )}
               </Field>
               <Field label={t("site")} name="siteId" error={e.siteId}>
-                <NativeSelect name="siteId" defaultValue={initial.siteId} placeholder="—" options={sites.map((s) => ({ value: s.id, label: s.name }))} />
-              </Field>
-              <Field label={t("owner")} name="ownerCustomerId" error={e.ownerCustomerId}>
-                <NativeSelect name="ownerCustomerId" defaultValue={initial.ownerCustomerId} placeholder="—" options={customers.map((c) => ({ value: c.id, label: c.label }))} />
+                <NativeSelect name="siteId" defaultValue={initial.siteId} placeholder="—" disabled={stockCar} options={sites.map((s) => ({ value: s.id, label: s.name }))} />
               </Field>
             </div>
-            {inStock && (
-              <div className="grid grid-cols-2 gap-3">
-                <Field label={t("listPrice")} name="listPriceCents" error={e.listPriceCents}>
-                  <TextInput name="listPriceCents" inputMode="decimal" defaultValue={initial.listPriceEuros ?? ""} placeholder="0,00 €" />
-                </Field>
-                <Field label={t("stockValue")} name="stockValueCents" error={e.stockValueCents}>
-                  <TextInput
-                    name="stockValueCents"
-                    inputMode="decimal"
-                    defaultValue={initial.stockValueEuros ?? ""}
-                    placeholder="0,00 €"
-                    disabled={isEdit}
-                    title={isEdit ? "Stock value changes only through purchases and reconditioning" : undefined}
-                  />
-                </Field>
-                {!isEdit && (
-                  <Field label={t("stockInDate")} name="stockInDate" error={e.stockInDate}>
-                    <TextInput name="stockInDate" type="date" defaultValue={initial.stockInDate ?? ""} />
+            {stockCar && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label={t("listPrice")} name="listPriceCents">
+                    <TextInput name="listPriceCents" disabled defaultValue={initial.listPriceEuros ?? ""} />
                   </Field>
+                  <Field label={t("stockValue")} name="stockValueCents">
+                    <TextInput name="stockValueCents" disabled defaultValue={initial.stockValueEuros ?? ""} />
+                  </Field>
+                  <Field label={t("vatRegime")} name="vatRegime">
+                    <TextInput name="vatRegime" disabled defaultValue={t(`vatRegimes.${initial.vatRegime ?? "STANDARD"}`)} />
+                  </Field>
+                </div>
+                <p className="text-xs text-muted-foreground">{t("stockCarLocked")}</p>
+              </>
+            )}
+            {!isEdit && (
+              <p className="text-xs text-muted-foreground" data-testid="stock-entry-hint">
+                {t("stockEntersThroughSales")}
+                {stockLinks?.vn && (
+                  <>
+                    {" "}
+                    <Link href="/sales/vn-stock/order" className="text-primary hover:underline">
+                      {ts("orderForStock")}
+                    </Link>
+                  </>
                 )}
-                <Field label={t("vatRegime")} name="vatRegime" error={e.vatRegime}>
-                  <NativeSelect
-                    name="vatRegime"
-                    defaultValue={initial.vatRegime ?? "STANDARD"}
-                    options={(["STANDARD", "MARGIN"] as const).map((v) => ({ value: v, label: t(`vatRegimes.${v}`) }))}
-                  />
-                </Field>
-              </div>
+                {stockLinks?.vn && stockLinks.vo && " · "}
+                {stockLinks?.vo && (
+                  <>
+                    {!stockLinks.vn && " "}
+                    <Link href="/sales/vo-stock/purchase" className="text-primary hover:underline">
+                      {ts("buyUsedCar")}
+                    </Link>
+                  </>
+                )}
+              </p>
             )}
           </fieldset>
         </div>

@@ -2,6 +2,7 @@ import { getTranslations } from "next-intl/server";
 import { getRequestContext, query } from "@/lib/session";
 import { formatMoney } from "@/lib/money";
 import { getCoreDashboard } from "@/modules/core";
+import { getSalesDashboard } from "@/modules/sales";
 import { ROLE_LABELS, type RoleKey } from "@/modules/admin";
 import { PageHeader, Section } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -26,6 +27,7 @@ export default async function DashboardPage() {
   const firstName = actor.name.split(" ")[0];
   const showStock = actor.permissions.has("vehicle:view");
   const d = await query((ctx) => getCoreDashboard(ctx), { resource: "dashboard", action: "view" });
+  const sales = actor.permissions.has("sales.order:view") ? await query((ctx) => getSalesDashboard(ctx)) : null;
 
   return (
     <div className="space-y-4">
@@ -34,7 +36,7 @@ export default async function DashboardPage() {
         badges={actor.roleKeys.map((k) => (
           <StatusBadge key={k} status={k} tone="indigo" label={ROLE_LABELS[k as RoleKey] ?? k} />
         ))}
-        subtitle="Role-specific dashboards arrive in phase 6. Below: group figures from the shared core."
+        subtitle={t("subtitle")}
       />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <Kpi label={t("customers")} value={d.customers} />
@@ -47,6 +49,20 @@ export default async function DashboardPage() {
           </>
         )}
       </div>
+      {sales && (
+        <Section title={t("salesTitle")}>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="sales-kpis">
+            <Kpi label={t("openLeads")} value={sales.openLeads} />
+            <Kpi label={t("quotesSent")} value={sales.sentQuotes} />
+            <Kpi label={t("pendingApprovals")} value={sales.pendingApprovals} tone={sales.pendingApprovals > 0 ? "warn" : undefined} />
+            <Kpi label={t("backlog")} value={sales.backlog} />
+            <Kpi label={t("ordersMtd")} value={sales.ordersMtd} sub={formatMoney(sales.ordersMtdCents, { decimals: false })} />
+            <Kpi label={t("frontEndMtd")} value={formatMoney(sales.frontEndMtdCents, { decimals: false })} />
+            <Kpi label={t("backEndMtd")} value={formatMoney(sales.backEndMtdCents, { decimals: false })} />
+            <Kpi label={t("deliveredMtd")} value={sales.deliveredMtd} />
+          </div>
+        </Section>
+      )}
       {showStock && (
         <Section title={t("bySite")}>
           <table className="w-full text-[13px]">

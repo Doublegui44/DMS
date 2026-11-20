@@ -70,7 +70,7 @@ export default async function EntriesPage({ searchParams }: { searchParams: Prom
         ]}
         filters={[
           { key: "journal", label: t("journal"), options: journals.map((j) => ({ value: j.code, label: `${j.code} — ${t(`journals.${j.code}`)}` })) },
-          { key: "source", label: t("source"), options: ["INVOICE", "PAYMENT", "MANUAL", "REVERSAL", "OPENING"].map((s) => ({ value: s, label: t(`sources.${s}`) })) },
+          { key: "source", label: t("source"), options: ["INVOICE", "PAYMENT", "SALES_ORDER", "VEHICLE_RECEIPT", "VO_PURCHASE", "VEHICLE_COST", "MANUAL", "REVERSAL", "OPENING"].map((s) => ({ value: s, label: t(`sources.${s}`) })) },
           { key: "period", label: t("period"), options: periods.map((x) => ({ value: x.id, label: periodLabel(x) })) },
           { key: "site", label: t("site"), options: sites.map((s) => ({ value: s.id, label: s.name })) },
         ]}

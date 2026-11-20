@@ -7,7 +7,13 @@ export function parseInput<S extends z.ZodTypeAny>(schema: S, data: unknown): z.
   if (!result.success) {
     const flat = result.error.flatten();
     const message = flat.formErrors[0] ?? Object.values(flat.fieldErrors).flat()[0] ?? "Invalid input";
-    throw new ValidationError(String(message), flat.fieldErrors as Record<string, string[] | undefined>);
+    // flatten() keys errors by the first path segment only; nested fields also get their full
+    // path ("tradeIn.offerCents") so forms can show the error next to the right input.
+    const fieldErrors = { ...flat.fieldErrors } as Record<string, string[] | undefined>;
+    for (const issue of result.error.issues) {
+      if (issue.path.length > 1) (fieldErrors[issue.path.join(".")] ??= []).push(issue.message);
+    }
+    throw new ValidationError(String(message), fieldErrors);
   }
   return result.data;
 }

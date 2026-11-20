@@ -39,7 +39,9 @@ export const DEFAULT_ACCOUNTS: AccountDef[] = [
   { code: "445711", label: "TVA collectée 10 %", type: "LIABILITY" },
   { code: "445712", label: "TVA collectée 5,5 %", type: "LIABILITY" },
   { code: "445715", label: "TVA collectée sur marge (biens d'occasion)", type: "LIABILITY" },
+  { code: "443100", label: "État — bonus écologique à recevoir", type: "ASSET" },
   { code: "445510", label: "TVA à décaisser", type: "LIABILITY" },
+  { code: "447100", label: "Malus écologique collecté à reverser", type: "LIABILITY" },
   { code: "467100", label: "Débours — certificats d'immatriculation", type: "LIABILITY" },
   { code: "467300", label: "Organismes de financement à recevoir", type: "ASSET" },
   { code: "467400", label: "Vendeurs particuliers VO", type: "LIABILITY" },
@@ -53,9 +55,11 @@ export const DEFAULT_ACCOUNTS: AccountDef[] = [
   { code: "603720", label: "Variation des stocks VO", type: "EXPENSE" },
   { code: "603730", label: "Variation des stocks pièces", type: "EXPENSE" },
   { code: "604000", label: "Sous-traitance (travaux extérieurs)", type: "EXPENSE" },
+  { code: "604100", label: "Achats de contrats de garantie et d'entretien", type: "EXPENSE" },
   { code: "607100", label: "Achats véhicules neufs", type: "EXPENSE" },
   { code: "607200", label: "Achats véhicules d'occasion", type: "EXPENSE" },
   { code: "607300", label: "Achats pièces de rechange", type: "EXPENSE" },
+  { code: "607400", label: "Achats d'accessoires", type: "EXPENSE" },
   { code: "613200", label: "Locations immobilières", type: "EXPENSE" },
   { code: "622200", label: "Commissions sur ventes", type: "EXPENSE" },
   { code: "626000", label: "Frais postaux et télécommunications", type: "EXPENSE" },
@@ -120,9 +124,14 @@ export const DEFAULT_MAPPINGS: Record<string, string> = {
   REVENUE_OTHER: "708800",
   DISCOUNTS_GRANTED: "709000",
   REGISTRATION_FEES: "467100",
+  ECO_BONUS_RECEIVABLE: "443100",
+  ECO_MALUS_PAYABLE: "447100",
   PURCHASE_VN: "607100",
   PURCHASE_VO: "607200",
   PURCHASE_PARTS: "607300",
+  PURCHASE_ACCESSORY: "607400",
+  PURCHASE_ADDON: "604100",
+  PURCHASE_RECONDITIONING: "604000",
   STOCK_VN: "371000",
   STOCK_VO: "372000",
   STOCK_PARTS: "373000",
@@ -136,6 +145,7 @@ export const DEFAULT_MAPPINGS: Record<string, string> = {
   TREASURY_CHEQUE: "512100",
   TREASURY_CASH: "530000",
   TREASURY_FINANCE_COMPANY: "467300",
+  TREASURY_TRADE_IN: "467400", // the trade-in purchase (Cr 467400) offsets the customer's invoice
   CAPITAL: "101000",
   OPENING_BALANCE: "890000",
   SUSPENSE: "471000",
@@ -153,12 +163,22 @@ export const REVENUE_KEYS: { key: string; label: string; department: "VN" | "VO"
   { key: "REVENUE_OTHER", label: "Other income", department: "OVERHEAD" },
 ];
 
+export type PaymentMethod = "TRANSFER" | "CARD" | "CHEQUE" | "CASH" | "FINANCE_COMPANY" | "TRADE_IN";
+
+/** Methods that move money (offered on payment forms); FINANCE_COMPANY and TRADE_IN are recorded by sales. */
+export const CASH_METHODS = ["TRANSFER", "CARD", "CHEQUE", "CASH"] as const;
+
 /** Treasury mapping key per payment method. */
-export function treasuryKey(method: "TRANSFER" | "CARD" | "CHEQUE" | "CASH" | "FINANCE_COMPANY"): string {
+export function treasuryKey(method: PaymentMethod): string {
   return `TREASURY_${method}`;
 }
 
+/** A trade-in "pays" with the customer's own car: its treasury account (467400) is the customer's. */
+export function treasuryIsCounterparty(method: PaymentMethod): boolean {
+  return method === "TRADE_IN";
+}
+
 /** Journal used for each payment method. */
-export function journalForMethod(method: "TRANSFER" | "CARD" | "CHEQUE" | "CASH" | "FINANCE_COMPANY"): string {
-  return method === "CASH" ? "CA" : method === "FINANCE_COMPANY" ? "OD" : "BQ";
+export function journalForMethod(method: PaymentMethod): string {
+  return method === "CASH" ? "CA" : method === "FINANCE_COMPANY" || method === "TRADE_IN" ? "OD" : "BQ";
 }

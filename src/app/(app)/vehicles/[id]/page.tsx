@@ -1,16 +1,15 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { Pencil } from "lucide-react";
+import { Factory, Pencil } from "lucide-react";
 import { getRequestContext, query } from "@/lib/session";
 import { can } from "@/lib/rbac";
 import { daysBetween, formatDate } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
-import { ageingLevel, allowedNextStatuses, getTimeline, getVehicle, type StockType, type VehicleStatus } from "@/modules/core";
+import { ageingLevel, getTimeline, getVehicle } from "@/modules/core";
 import { Fields, PageHeader, Section } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Timeline } from "@/components/shared/timeline";
 import { Button } from "@/components/ui/button";
-import { StatusChangeForm } from "./status-change-form";
 
 export default async function VehiclePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -25,7 +24,13 @@ export default async function VehiclePage({ params }: { params: Promise<{ id: st
   const inStock = v.stockType !== "NONE";
   const days = inStock && v.stockInDate ? daysBetween(v.stockInDate, businessDate) : null;
   const level = days !== null ? ageingLevel(days) : null;
-  const next = allowedNextStatuses(v.status as VehicleStatus, v.stockType as StockType);
+  // A stock car is moved, priced and sold from its sales page (D-048).
+  const salesHref =
+    v.stockType === "VN" && can(actor.permissions, "sales.vn_stock", "view", v.siteId ?? undefined)
+      ? `/sales/vn-stock/${v.id}`
+      : v.stockType === "VO" && can(actor.permissions, "sales.vo_stock", "view", v.siteId ?? undefined)
+        ? `/sales/vo-stock/${v.id}`
+        : null;
 
   return (
     <div>
@@ -41,12 +46,23 @@ export default async function VehiclePage({ params }: { params: Promise<{ id: st
           </>
         }
         actions={
-          canEdit && (
-            <Button asChild size="sm" variant="outline">
-              <Link href={`/vehicles/${id}/edit`}>
-                <Pencil /> {t("common.edit")}
-              </Link>
-            </Button>
+          (salesHref || canEdit) && (
+            <>
+              {salesHref && (
+                <Button asChild size="sm" variant="outline">
+                  <Link href={salesHref}>
+                    <Factory /> {tv("openInSales")}
+                  </Link>
+                </Button>
+              )}
+              {canEdit && (
+                <Button asChild size="sm" variant="outline">
+                  <Link href={`/vehicles/${id}/edit`}>
+                    <Pencil /> {t("common.edit")}
+                  </Link>
+                </Button>
+              )}
+            </>
           )
         }
       />
@@ -90,13 +106,8 @@ export default async function VehiclePage({ params }: { params: Promise<{ id: st
             </Section>
           )}
           <Section title={tv("statusHistory")}>
-            {canEdit && next.length > 0 && (
-              <StatusChangeForm
-                vehicleId={v.id}
-                options={next.map((s) => ({ value: s, label: tv(`statuses.${s}`) }))}
-              />
-            )}
-            <table className="mt-3 w-full text-[13px]">
+            {inStock && <p className="text-xs text-muted-foreground">{tv("statusFollowsFlow")}</p>}
+            <table className="mt-2 w-full text-[13px]">
               <tbody className="divide-y">
                 {v.statusHistory.map((h) => (
                   <tr key={h.id}>

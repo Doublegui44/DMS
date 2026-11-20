@@ -32,8 +32,8 @@ export function Timeline({ items, empty = "No activity yet." }: { items: Timelin
   );
 }
 
-/** "VehicleStatusChanged" → "Vehicle status changed"; "customer.contact.add" → "Customer contact add". */
+/** "VehicleStatusChanged" → "Vehicle status changed"; "factory_order.ship" → "Factory order ship". */
 function humanise(s: string): string {
-  const spaced = s.replace(/\./g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+  const spaced = s.replace(/[._]/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }

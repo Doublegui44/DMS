@@ -9,7 +9,8 @@ export { createAccount, updateAccount, setAccountMapping } from "./services/char
 export { ensurePeriod, ensurePeriods, lockPeriod, reopenPeriod } from "./services/periods";
 export { postEntry, postManualEntry, reverseEntry } from "./services/posting";
 export { createInvoice, issueInvoice, createAndIssueInvoice, creditInvoice, deleteDraftInvoice, settledStatus } from "./services/invoices";
-export { recordPayment, allocatePayment } from "./services/payments";
+export { recordPayment, allocatePayment, type PaymentOptions } from "./services/payments";
+export { registerAccountingHandlers } from "./handlers";
 export { letterLines, unletter, letterSettlement } from "./services/lettering";
 export { installDefaultChart, postOpeningBalances } from "./services/setup";
 export * from "./queries/accounting";

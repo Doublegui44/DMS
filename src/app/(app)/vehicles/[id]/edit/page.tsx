@@ -27,7 +27,6 @@ export default async function EditVehiclePage({ params }: { params: Promise<{ id
         initial={{
           ...v,
           firstRegistration: isoDate(v.firstRegistration),
-          stockInDate: isoDate(v.stockInDate),
           listPriceEuros: euros(v.listPriceCents),
           stockValueEuros: euros(v.stockValueCents),
         }}

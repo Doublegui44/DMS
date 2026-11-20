@@ -10,7 +10,10 @@ export const metadata: Metadata = { title: "Sign in" };
 
 export default async function LoginPage() {
   const session = await auth();
-  if (session?.user?.id) redirect("/dashboard");
+  // A session whose user is gone (database reseeded) or deactivated must not bounce back to the
+  // app, which would send it here again: show the form so the user signs in afresh.
+  const current = session?.user?.id ? await db.user.findFirst({ where: { id: session.user.id, active: true }, select: { id: true } }) : null;
+  if (current) redirect("/dashboard");
   const t = await getTranslations("login");
   const tApp = await getTranslations("app");
 

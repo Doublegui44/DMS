@@ -42,7 +42,25 @@ export function handlersFor(type: string): EventHandler<EventType>[] {
   return handlers.get(type) ?? [];
 }
 
+const registeredGroups = new Set<string>();
+
+/**
+ * Register a module's handlers once per process (idempotent across hot reloads of the caller).
+ * Lives next to the handler map so both reset together if this module is re-evaluated.
+ */
+export function registerHandlersOnce(group: string, register: () => void): void {
+  if (registeredGroups.has(group)) return;
+  registeredGroups.add(group);
+  register();
+}
+
+/** True once `src/modules/register.ts` has run in this process (checked by runCommand). */
+export function handlersRegistered(): boolean {
+  return registeredGroups.size > 0;
+}
+
 /** Test helper. */
 export function clearHandlers(): void {
   handlers.clear();
+  registeredGroups.clear();
 }

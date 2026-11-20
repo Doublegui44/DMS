@@ -614,6 +614,16 @@ erDiagram
   }
 ```
 
+**As built (Phase 3).** The models match the diagram, with these differences:
+- **Delivery:** there is no `Delivery` entity; delivery date and mileage are stored on `SalesOrder`, and the invoice is linked through `SalesOrder.invoiceId`.
+- **Statuses:** a quote is `DRAFT → PENDING_APPROVAL / SENT → ACCEPTED / DECLINED / EXPIRED`; an order is `CONFIRMED → INVOICED → DELIVERED` or `CANCELLED`.
+- **Reservations:** a reservation belongs to a quote and becomes `CONVERTED` when the customer signs.
+- **Approvals:** discount approvals use the generic `ApprovalRule` / `ApprovalRequest` tables (D-036).
+- **VO purchases:** `VoPurchase.source` is `TRADE_IN`, `PRIVATE`, `PROFESSIONAL` or `OPENING`, with the seller as a customer or a supplier.
+- **Factory orders:** a factory order points to its vehicle and, for customer orders, to the order.
+- **Vehicle record:** core keeps the vehicle, but only the sales flows create stock cars and change their status, prices and site (`trusted` calls). The vehicle screens register customers' cars and correct descriptive data (D-048).
+- **Services:** `leads`, `quotes`, `reservations`, `orders`, `trade-in`, `vn-stock` and `vo-stock`. Pure rules live in `domain/pricing.ts` (deal lines, VAT, margins, commission), `fees.ts` (registration fee, eco bonus and malus), `financing.ts` (payments, APR) and `workflow.ts` (stage and status guards, approval level).
+
 ### 6.4 Workshop (after-sales)
 
 ```mermaid
@@ -1029,16 +1039,20 @@ Inventory is **perpetual** (see D-005): purchases go to class 60x, stock entries
 
 | Event | Journal | Debit | Credit |
 |---|---|---|---|
-| VN purchase invoice from OEM | AC | 6071 VN purchases (VN) + 44566 VAT deductible | 401 OEM |
-| VN arrives in stock | OD | 3711 VN stock | 60371 VN stock variation (VN) |
-| VN sales invoice | VE | 411 customer | 7071 VN sales (VN), 44571 VAT collected, 4687 registration fees (pass-through) |
-| VN cost of sale (at invoice) | OD | 60371 (VN) | 3711 VN stock |
-| Trade-in / VO purchase from private | AC | 6072 VO purchases (VO) | 411 customer (trade-in offsets the deal) or 467 private seller |
-| VO purchase from professional | AC | 6072 (VO) + 44566 | 401 supplier |
-| VO enters stock / reconditioning capitalised | OD | 3712 VO stock | 60372 (VO) |
-| VO sale, margin regime | VE | 411 | 7072 VO sales margin regime (VO), 44571 VAT on margin |
-| VO sale, standard regime | VE | 411 | 7072 (VO), 44571 |
-| VO cost of sale | OD | 60372 (VO) | 3712 |
+| VN arrival: OEM invoice | AC | 607100 VN purchases (VN) + 445660 VAT deductible | 401100 OEM |
+| VN arrival: stock entry | OD | 371000 VN stock | 603710 VN stock variation (VN) |
+| VN / VO sales invoice | VE | 411000 customer | 707100 VN / 707200 VO (net of discount), 706500 add-ons, 445710 VAT or 445715 VAT on margin; pass-through lines with no VAT: 467100 registration certificate, 447100 eco malus; eco bonus advanced: Dr 443100 |
+| Cost of sale (at invoice) | OD | 603710 / 603720 | 371000 / 372000 |
+| Trade-in taken at signature | AC + OD | 607200 VO purchases (VO); then 372000 | 467400 private seller (party = customer); then 603720 |
+| Trade-in settles the invoice | OD | 467400 | 411000 |
+| Finance company takes over the financed amount | OD | 467300 finance company | 411000 |
+| Dealer finance commission | OD | 467300 | 706600 finance commission (back-end) |
+| OEM incentive claim | VE | 411100 OEM | 707100 + 445710 |
+| Add-on and accessory costs (accrual) | AC | 604100 / 607400 | 408100 |
+| VO purchase from a private seller | AC + BQ | 607200 (VO), then 467400 | 467400 (party = customer), then 512100 |
+| VO purchase from a trader | AC | 607200 (VO) + 445660 if the trader charges VAT | 401000 supplier |
+| VO stock entry / capitalised cost | OD | 372000 VO stock | 603720 (VO); the cost itself: Dr 604000 + 445660 / Cr 401000 |
+| Deposit on an order | BQ/CA | 512100 / 530000 | 411000 (on account, allocated to the invoice when it is issued) |
 | RO customer invoice | VE | 411 | 7061 labour (WORKSHOP), 7073 parts (PARTS), 7062 sublet (WORKSHOP), 44571 |
 | RO warranty | VE | 4111 OEM warranty receivable | 7063 warranty labour (WORKSHOP), 7074 warranty parts (PARTS) |
 | RO internal (VO reconditioning) | OD | 3712 VO stock | 7064 internal labour (WORKSHOP), 7075 internal parts (PARTS) |

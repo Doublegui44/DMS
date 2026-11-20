@@ -25,11 +25,11 @@ export function Topbar({ userName, roleLabels, sites, activeSiteId, businessDate
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-3 border-b bg-background px-4">
-      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+      <label className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
         {t("site")}
         <select
           aria-label={t("site")}
-          className="h-7 rounded-md border bg-background px-2 text-[13px] text-foreground"
+          className="h-7 min-w-0 max-w-56 truncate rounded-md border bg-background px-2 text-[13px] text-foreground"
           value={activeSiteId ?? ""}
           disabled={pending || sites.length < 2}
           onChange={(e) => startTransition(() => setActiveSite(e.target.value))}
@@ -43,7 +43,7 @@ export function Topbar({ userName, roleLabels, sites, activeSiteId, businessDate
       </label>
 
       <div
-        className="flex items-center gap-1.5 rounded-md border border-amber-300/60 bg-amber-50 px-2 py-1 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
+        className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-amber-300/60 bg-amber-50 px-2 py-1 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
         title={t("businessDate")}
         data-testid="business-date"
       >

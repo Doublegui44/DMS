@@ -29,9 +29,12 @@ export const NAV: NavGroup[] = [
   {
     key: "sales",
     items: [
-      { key: "pipeline", href: "/sales/pipeline", resource: "sales.lead", icon: "KanbanSquare", phase: 3 },
-      { key: "voStock", href: "/sales/vo-stock", resource: "sales.vo_stock", icon: "CarFront", phase: 3 },
-      { key: "catalogue", href: "/sales/catalogue", resource: "sales.catalogue", icon: "BookOpen", phase: 3 },
+      { key: "pipeline", href: "/sales/pipeline", resource: "sales.lead", icon: "KanbanSquare" },
+      { key: "orders", href: "/sales/orders", resource: "sales.order", icon: "ClipboardCheck" },
+      { key: "vnStock", href: "/sales/vn-stock", resource: "sales.vn_stock", icon: "Factory" },
+      { key: "voStock", href: "/sales/vo-stock", resource: "sales.vo_stock", icon: "CarFront" },
+      { key: "policeRegister", href: "/sales/police-register", resource: "sales.vo_stock", icon: "ScrollText" },
+      { key: "catalogue", href: "/sales/catalogue", resource: "sales.catalogue", icon: "BookOpen" },
     ],
   },
   {

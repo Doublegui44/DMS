@@ -5,7 +5,8 @@ import { addDays } from "@/lib/dates";
 export async function getCoreDashboard(ctx: ServiceContext) {
   ctx.require("dashboard", "view");
   const siteFilter = ctx.actor.siteIds === "ALL" ? {} : { siteId: { in: ctx.actor.siteIds } };
-  const inStockVn = { stockType: "VN" as const, status: { in: ["IN_STOCK" as const, "RESERVED" as const] } };
+  // A new car is in stock (and in account 371) from its arrival only: a reserved car still on order is not.
+  const inStockVn = { stockType: "VN" as const, status: { in: ["IN_STOCK" as const, "RESERVED" as const] }, stockInDate: { not: null } };
   const inStockVo = { stockType: "VO" as const, status: { in: ["INTAKE" as const, "RECONDITIONING" as const, "FOR_SALE" as const, "RESERVED" as const] } };
   const aged = addDays(ctx.businessDate, -90);
 
@@ -13,7 +14,7 @@ export async function getCoreDashboard(ctx: ServiceContext) {
     ctx.tx.customer.count({ where: { kind: { not: "OEM" } } }),
     ctx.tx.vehicle.aggregate({ where: { ...siteFilter, ...inStockVn }, _count: true, _sum: { stockValueCents: true } }),
     ctx.tx.vehicle.aggregate({ where: { ...siteFilter, ...inStockVo }, _count: true, _sum: { stockValueCents: true } }),
-    ctx.tx.vehicle.count({ where: { ...siteFilter, stockType: "VN", status: { in: ["ORDERED", "IN_TRANSIT"] } } }),
+    ctx.tx.vehicle.count({ where: { ...siteFilter, stockType: "VN", stockInDate: null, status: { in: ["ORDERED", "IN_TRANSIT", "RESERVED"] } } }),
     ctx.tx.vehicle.count({ where: { ...siteFilter, ...inStockVo, stockInDate: { lte: aged } } }),
     ctx.tx.vehicle.groupBy({
       by: ["siteId", "stockType"],

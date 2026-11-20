@@ -54,50 +54,60 @@ model VatRate {
 }
 
 model Site {
-  id               String       @id @default(cuid())
-  groupId          String
-  code             String       @unique // NTE, REN, ANG
-  slug             String       @unique // nantes, rennes, angers
-  name             String
-  address          String
-  postalCode       String
-  city             String
-  countryCode      String
-  phone            String?
-  siret            String?
-  labourRateCents  Int // customer labour rate excl. VAT per hour
-  createdAt        DateTime     @default(now())
-  group            Group        @relation(fields: [groupId], references: [id])
-  country          Country      @relation(fields: [countryCode], references: [code])
-  brands           SiteBrand[]
-  departments      Department[]
-  userRoles        UserRole[]
-  vehicles         Vehicle[]
-  auditLogs        AuditLog[]
-  domainEvents     DomainEvent[]
-  settings         Setting[]
-  customers        Customer[]   @relation("CustomerHomeSite")
-  journalEntries   JournalEntry[]
-  invoices         Invoice[]
-  payments         Payment[]
-  accountMappings  AccountMapping[]
+  id              String                @id @default(cuid())
+  groupId         String
+  code            String                @unique // NTE, REN, ANG
+  slug            String                @unique // nantes, rennes, angers
+  name            String
+  address         String
+  postalCode      String
+  city            String
+  countryCode     String
+  phone           String?
+  siret           String?
+  labourRateCents Int // customer labour rate excl. VAT per hour
+  createdAt       DateTime              @default(now())
+  group           Group                 @relation(fields: [groupId], references: [id])
+  country         Country               @relation(fields: [countryCode], references: [code])
+  brands          SiteBrand[]
+  departments     Department[]
+  userRoles       UserRole[]
+  vehicles        Vehicle[]
+  auditLogs       AuditLog[]
+  domainEvents    DomainEvent[]
+  settings        Setting[]
+  customers       Customer[]            @relation("CustomerHomeSite")
+  journalEntries  JournalEntry[]
+  invoices        Invoice[]
+  payments        Payment[]
+  accountMappings AccountMapping[]
+  leads           Lead[]
+  quotes          Quote[]
+  salesOrders     SalesOrder[]
+  reservations    Reservation[]
+  factoryOrders   FactoryOrder[]
+  voPurchases     VoPurchase[]
+  policeRegister  PoliceRegisterEntry[]
+  commissions     Commission[]
 
   @@map("site")
 }
 
 model Brand {
-  id            String      @id @default(cuid())
-  groupId       String
-  code          String      @unique
-  name          String
-  oemCustomerId String?     @unique // OEM as a customer (warranty receivables)
-  oemSupplierId String?     @unique // OEM as a supplier (vehicle & parts purchases)
-  group         Group       @relation(fields: [groupId], references: [id])
-  sites         SiteBrand[]
-  vehicles      Vehicle[]
-  oemCustomer   Customer?   @relation("BrandOemCustomer", fields: [oemCustomerId], references: [id])
-  oemSupplier   Supplier?   @relation("BrandOemSupplier", fields: [oemSupplierId], references: [id])
+  id              String           @id @default(cuid())
+  groupId         String
+  code            String           @unique
+  name            String
+  oemCustomerId   String?          @unique // OEM as a customer (warranty receivables)
+  oemSupplierId   String?          @unique // OEM as a supplier (vehicle & parts purchases)
+  wmi             String? // VIN world manufacturer identifier, e.g. VF3
+  group           Group            @relation(fields: [groupId], references: [id])
+  sites           SiteBrand[]
+  vehicles        Vehicle[]
+  oemCustomer     Customer?        @relation("BrandOemCustomer", fields: [oemCustomerId], references: [id])
+  oemSupplier     Supplier?        @relation("BrandOemSupplier", fields: [oemSupplierId], references: [id])
   accountMappings AccountMapping[]
+  catalogueModels CatalogueModel[]
 
   @@map("brand")
 }
@@ -151,6 +161,10 @@ model User {
   auditLogs      AuditLog[]
   approvalsMade  ApprovalRequest[] @relation("ApprovalDecider")
   approvalsAsked ApprovalRequest[] @relation("ApprovalRequester")
+  leads          Lead[]            @relation("LeadSalesperson")
+  quotes         Quote[]           @relation("QuoteSalesperson")
+  salesOrders    SalesOrder[]      @relation("OrderSalesperson")
+  commissions    Commission[]
 
   @@map("user")
 }
@@ -269,41 +283,46 @@ enum PriceClass {
 }
 
 model Customer {
-  id            String       @id @default(cuid())
-  number        String       @unique // C000123
-  kind          CustomerKind
+  id               String        @id @default(cuid())
+  number           String        @unique // C000123
+  kind             CustomerKind
   // individuals
-  title         String?
-  firstName     String?
-  lastName      String?
+  title            String?
+  firstName        String?
+  lastName         String?
   // companies
-  companyName   String?
-  siren         String?
-  vatNumber     String?
+  companyName      String?
+  siren            String?
+  vatNumber        String?
   // shared
-  displayName   String // denormalised for search & lists
-  email         String?
-  phone         String?
-  address       String?
-  postalCode    String?
-  city          String?
-  countryCode   String       @default("FR")
-  priceClass    PriceClass   @default(RETAIL)
-  paymentTermsDays Int       @default(0)
-  accountCode   String // auxiliary customer account, e.g. 411C000123
-  consentEmail  Boolean      @default(false)
-  consentSms    Boolean      @default(false)
-  consentPhone  Boolean      @default(false)
-  homeSiteId    String?
-  notes         String?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  homeSite      Site?        @relation("CustomerHomeSite", fields: [homeSiteId], references: [id])
-  contacts      Contact[]
-  vehicles      Vehicle[]
-  oemOfBrand    Brand?       @relation("BrandOemCustomer")
-  invoices      Invoice[]
-  payments      Payment[]
+  displayName      String // denormalised for search & lists
+  email            String?
+  phone            String?
+  address          String?
+  postalCode       String?
+  city             String?
+  countryCode      String        @default("FR")
+  priceClass       PriceClass    @default(RETAIL)
+  paymentTermsDays Int           @default(0)
+  accountCode      String // auxiliary customer account, e.g. 411C000123
+  consentEmail     Boolean       @default(false)
+  consentSms       Boolean       @default(false)
+  consentPhone     Boolean       @default(false)
+  homeSiteId       String?
+  notes            String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  homeSite         Site?         @relation("CustomerHomeSite", fields: [homeSiteId], references: [id])
+  contacts         Contact[]
+  vehicles         Vehicle[]
+  oemOfBrand       Brand?        @relation("BrandOemCustomer")
+  invoices         Invoice[]
+  payments         Payment[]
+  leads            Lead[]
+  quotes           Quote[]
+  salesOrders      SalesOrder[]
+  reservations     Reservation[]
+  voPurchases      VoPurchase[]
 
   @@index([displayName])
   @@map("customer")
@@ -393,6 +412,15 @@ model Vehicle {
   owner             Customer?              @relation(fields: [ownerCustomerId], references: [id])
   options           VehicleOption[]
   statusHistory     VehicleStatusHistory[]
+  quotes            Quote[]
+  salesOrders       SalesOrder[]
+  reservations      Reservation[]
+  factoryOrder      FactoryOrder?
+  voPurchases       VoPurchase[]
+  policeEntries     PoliceRegisterEntry[]
+  costLines         VehicleCostLine[]
+  priceChanges      VoPriceChange[]
+  tradeIns          TradeInAppraisal[]
 
   @@index([status, stockType])
   @@index([siteId])
@@ -503,10 +531,10 @@ model Setting {
 // ─────────────────────────────────────────────────────────────
 
 model Supplier {
-  id               String    @id @default(cuid())
-  number           String    @unique // F00012
+  id               String            @id @default(cuid())
+  number           String            @unique // F00012
   name             String
-  isOem            Boolean   @default(false)
+  isOem            Boolean           @default(false)
   siren            String?
   vatNumber        String?
   email            String?
@@ -514,13 +542,15 @@ model Supplier {
   address          String?
   postalCode       String?
   city             String?
-  countryCode      String    @default("FR")
-  paymentTermsDays Int       @default(30)
+  countryCode      String            @default("FR")
+  paymentTermsDays Int               @default(30)
   accountCode      String // auxiliary code, e.g. 401F00012
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  oemOfBrand       Brand?    @relation("BrandOemSupplier")
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  oemOfBrand       Brand?            @relation("BrandOemSupplier")
   payments         Payment[]
+  voPurchases      VoPurchase[]
+  vehicleCosts     VehicleCostLine[]
 
   @@map("supplier")
 }
@@ -539,16 +569,16 @@ enum AccountType {
 
 /// Chart of accounts (PCG by default, configurable).
 model Account {
-  code             String         @id // e.g. "707100"
+  code             String           @id // e.g. "707100"
   label            String
   class            Int // first digit, 1..8
   type             AccountType
-  postable         Boolean        @default(true)
-  requiresAnalytic Boolean        @default(false) // classes 6/7 need a department
-  isReceivable     Boolean        @default(false) // lines need a CUSTOMER party
-  isPayable        Boolean        @default(false) // lines need a SUPPLIER party
-  active           Boolean        @default(true)
-  createdAt        DateTime       @default(now())
+  postable         Boolean          @default(true)
+  requiresAnalytic Boolean          @default(false) // classes 6/7 need a department
+  isReceivable     Boolean          @default(false) // lines need a CUSTOMER party
+  isPayable        Boolean          @default(false) // lines need a SUPPLIER party
+  active           Boolean          @default(true)
+  createdAt        DateTime         @default(now())
   lines            JournalLine[]
   mappings         AccountMapping[]
 
@@ -598,23 +628,23 @@ model FiscalPeriod {
 
 /// Posted entries are immutable; corrections are reversal entries.
 model JournalEntry {
-  id           String         @id @default(cuid())
-  number       String         @unique // VE-2026-000123, gap-free per journal & year
+  id           String        @id @default(cuid())
+  number       String        @unique // VE-2026-000123, gap-free per journal & year
   journalCode  String
   periodId     String
   siteId       String
-  entryDate    DateTime       @db.Date
+  entryDate    DateTime      @db.Date
   label        String
   sourceType   String? // INVOICE, PAYMENT, MANUAL, OPENING, REVERSAL…
   sourceId     String?
-  reversalOfId String?        @unique
+  reversalOfId String?       @unique
   createdById  String?
-  createdAt    DateTime       @default(now())
-  journal      Journal        @relation(fields: [journalCode], references: [code])
-  period       FiscalPeriod   @relation(fields: [periodId], references: [id])
-  site         Site           @relation(fields: [siteId], references: [id])
-  reversalOf   JournalEntry?  @relation("EntryReversal", fields: [reversalOfId], references: [id])
-  reversedBy   JournalEntry?  @relation("EntryReversal")
+  createdAt    DateTime      @default(now())
+  journal      Journal       @relation(fields: [journalCode], references: [code])
+  period       FiscalPeriod  @relation(fields: [periodId], references: [id])
+  site         Site          @relation(fields: [siteId], references: [id])
+  reversalOf   JournalEntry? @relation("EntryReversal", fields: [reversalOfId], references: [id])
+  reversedBy   JournalEntry? @relation("EntryReversal")
   lines        JournalLine[]
 
   @@index([sourceType, sourceId])
@@ -680,33 +710,34 @@ enum InvoiceStatus {
 
 /// One table for every sales invoice and credit note (D-013). Numbered only at issue.
 model Invoice {
-  id                String         @id @default(cuid())
-  number            String?        @unique
-  kind              InvoiceKind    @default(INVOICE)
+  id                String              @id @default(cuid())
+  number            String?             @unique
+  kind              InvoiceKind         @default(INVOICE)
   sourceType        String // MANUAL, SALES_ORDER, REPAIR_ORDER, COUNTER_SALE, WARRANTY_CLAIM
   sourceId          String?
   siteId            String
   customerId        String
-  vatRegime         VatRegime      @default(STANDARD)
-  status            InvoiceStatus  @default(DRAFT)
-  issueDate         DateTime?      @db.Date
-  dueDate           DateTime?      @db.Date
-  totalExclVatCents Int            @default(0)
-  vatCents          Int            @default(0)
-  totalInclVatCents Int            @default(0)
-  paidCents         Int            @default(0)
+  vatRegime         VatRegime           @default(STANDARD)
+  status            InvoiceStatus       @default(DRAFT)
+  issueDate         DateTime?           @db.Date
+  dueDate           DateTime?           @db.Date
+  totalExclVatCents Int                 @default(0)
+  vatCents          Int                 @default(0)
+  totalInclVatCents Int                 @default(0)
+  paidCents         Int                 @default(0)
   creditedInvoiceId String?
-  journalEntryId    String?        @unique
+  journalEntryId    String?             @unique
   notes             String?
   createdById       String?
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
-  site              Site           @relation(fields: [siteId], references: [id])
-  customer          Customer       @relation(fields: [customerId], references: [id])
-  creditedInvoice   Invoice?       @relation("CreditNoteOf", fields: [creditedInvoiceId], references: [id])
-  creditNotes       Invoice[]      @relation("CreditNoteOf")
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  site              Site                @relation(fields: [siteId], references: [id])
+  customer          Customer            @relation(fields: [customerId], references: [id])
+  creditedInvoice   Invoice?            @relation("CreditNoteOf", fields: [creditedInvoiceId], references: [id])
+  creditNotes       Invoice[]           @relation("CreditNoteOf")
   lines             InvoiceLine[]
   allocations       PaymentAllocation[]
+  salesOrder        SalesOrder?
 
   @@index([customerId, status])
   @@index([sourceType, sourceId])
@@ -725,6 +756,7 @@ model InvoiceLine {
   vatRateCode           String
   vatRateBp             Int
   vatCents              Int
+  vatRegime             VatRegime      @default(STANDARD) // MARGIN = VAT on the margin (used vehicle)
   departmentCode        DepartmentCode
   revenueKey            String // AccountMapping key, e.g. REVENUE_LABOUR
   invoice               Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
@@ -744,6 +776,7 @@ enum PaymentMethod {
   CHEQUE
   CASH
   FINANCE_COMPANY
+  TRADE_IN // payment in kind: the customer's trade-in offsets the invoice
 }
 
 model Payment {
@@ -759,6 +792,8 @@ model Payment {
   allocatedCents Int                 @default(0)
   businessDate   DateTime            @db.Date
   reference      String?
+  sourceType     String? // e.g. SALES_ORDER for a deposit taken on an order
+  sourceId       String?
   journalEntryId String?             @unique
   createdById    String?
   createdAt      DateTime            @default(now())
@@ -770,6 +805,7 @@ model Payment {
 
   @@index([customerId])
   @@index([supplierId])
+  @@index([sourceType, sourceId])
   @@map("payment")
 }
 
@@ -783,4 +819,508 @@ model PaymentAllocation {
   invoice     Invoice  @relation(fields: [invoiceId], references: [id])
 
   @@map("payment_allocation")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Sales VN / VO: catalogue, pipeline, orders, stock
+// ─────────────────────────────────────────────────────────────
+
+enum CatalogueOptionKind {
+  PAINT
+  PACK
+  EQUIPMENT
+}
+
+model CatalogueModel {
+  id       String             @id @default(cuid())
+  brandId  String
+  name     String
+  active   Boolean            @default(true)
+  brand    Brand              @relation(fields: [brandId], references: [id])
+  versions CatalogueVersion[]
+
+  @@unique([brandId, name])
+  @@map("catalogue_model")
+}
+
+/// OEM catalogue version. Prices are excl. VAT; dealer cost is what the OEM invoices.
+model CatalogueVersion {
+  id                    String            @id @default(cuid())
+  modelId               String
+  code                  String            @unique
+  name                  String
+  fuel                  FuelType
+  co2                   Int // g/km
+  powerHp               Int
+  listPriceExclVatCents Int
+  dealerCostCents       Int
+  oemIncentiveCents     Int               @default(0) // OEM-funded customer incentive, excl. VAT
+  leadTimeDays          Int               @default(45)
+  active                Boolean           @default(true)
+  model                 CatalogueModel    @relation(fields: [modelId], references: [id])
+  options               CatalogueOption[]
+  quotes                Quote[]
+  factoryOrders         FactoryOrder[]
+
+  @@map("catalogue_version")
+}
+
+model CatalogueOption {
+  id                    String              @id @default(cuid())
+  versionId             String
+  code                  String
+  label                 String
+  kind                  CatalogueOptionKind
+  listPriceExclVatCents Int
+  dealerCostCents       Int
+  version               CatalogueVersion    @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@unique([versionId, code])
+  @@map("catalogue_option")
+}
+
+enum AddOnKind {
+  WARRANTY
+  MAINTENANCE
+}
+
+/// Add-on products sold with a vehicle (back-end margin).
+model AddOnProduct {
+  id                String    @id @default(cuid())
+  code              String    @unique
+  kind              AddOnKind
+  name              String
+  months            Int
+  priceExclVatCents Int
+  costCents         Int
+  active            Boolean   @default(true)
+
+  @@map("add_on_product")
+}
+
+enum LeadSource {
+  WALK_IN
+  PHONE
+  WEB
+  REFERRAL
+  RETURNING
+  EVENT
+}
+
+enum LeadStage {
+  NEW
+  CONTACTED
+  QUOTED
+  WON
+  LOST
+}
+
+model Lead {
+  id            String       @id @default(cuid())
+  number        String       @unique
+  siteId        String
+  customerId    String
+  salespersonId String?
+  source        LeadSource
+  interest      StockType // VN or VO
+  stage         LeadStage    @default(NEW)
+  description   String?
+  lostReason    String?
+  openedOn      DateTime     @db.Date
+  closedOn      DateTime?    @db.Date
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  site          Site         @relation(fields: [siteId], references: [id])
+  customer      Customer     @relation(fields: [customerId], references: [id])
+  salesperson   User?        @relation("LeadSalesperson", fields: [salespersonId], references: [id])
+  quotes        Quote[]
+  salesOrders   SalesOrder[]
+
+  @@index([siteId, stage])
+  @@map("lead")
+}
+
+enum QuoteStatus {
+  DRAFT
+  PENDING_APPROVAL
+  SENT
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+/// A priced deal offered to the customer. Totals are a snapshot computed by the pricing domain.
+model Quote {
+  id                    String            @id @default(cuid())
+  number                String            @unique
+  leadId                String
+  siteId                String
+  customerId            String
+  salespersonId         String?
+  stockType             StockType // VN or VO
+  vehicleId             String? // a stock vehicle (VN in stock or on order, VO for sale)
+  catalogueVersionId    String? // or a VN to order from the OEM
+  colour                String?
+  status                QuoteStatus       @default(DRAFT)
+  vatRegime             VatRegime         @default(STANDARD)
+  createdOn             DateTime          @db.Date
+  validUntil            DateTime          @db.Date
+  listPriceInclVatCents Int               @default(0) // vehicle + options at list price
+  discountInclVatCents  Int               @default(0) // dealer discount as shown to the customer
+  discountBp            Int               @default(0) // effective discount (incl. trade-in over-allowance)
+  totalExclVatCents     Int               @default(0)
+  vatCents              Int               @default(0)
+  totalInclVatCents     Int               @default(0)
+  tradeInCents          Int               @default(0)
+  financedCents         Int               @default(0)
+  balanceDueCents       Int               @default(0)
+  frontEndMarginCents   Int               @default(0)
+  backEndMarginCents    Int               @default(0)
+  commissionCents       Int               @default(0)
+  sentOn                DateTime?         @db.Date
+  decidedOn             DateTime?         @db.Date
+  notes                 String?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  lead                  Lead              @relation(fields: [leadId], references: [id])
+  site                  Site              @relation(fields: [siteId], references: [id])
+  customer              Customer          @relation(fields: [customerId], references: [id])
+  salesperson           User?             @relation("QuoteSalesperson", fields: [salespersonId], references: [id])
+  vehicle               Vehicle?          @relation(fields: [vehicleId], references: [id])
+  catalogueVersion      CatalogueVersion? @relation(fields: [catalogueVersionId], references: [id])
+  lines                 DealLine[]
+  tradeIn               TradeInAppraisal?
+  financing             FinancingPlan?
+  salesOrder            SalesOrder?
+  reservations          Reservation[]
+
+  @@index([siteId, status])
+  @@index([leadId])
+  @@map("quote")
+}
+
+enum DealLineKind {
+  VEHICLE
+  OPTION
+  ACCESSORY
+  DISCOUNT
+  OEM_INCENTIVE
+  ECO_BONUS
+  ECO_MALUS
+  REGISTRATION_FEE
+  ADDON
+}
+
+enum DealVatMode {
+  STANDARD // price excl. VAT, VAT at the standard rate
+  MARGIN // price incl. VAT, VAT due on the margin only (used vehicle)
+  NONE // outside the scope of VAT: taxes, pass-through fees, State bonus
+}
+
+model DealLine {
+  id                 String       @id @default(cuid())
+  quoteId            String
+  lineNo             Int
+  kind               DealLineKind
+  label              String
+  quantity           Int          @default(1)
+  unitPriceCents     Int // excl. VAT; incl. VAT for MARGIN lines
+  unitCostCents      Int          @default(0)
+  purchasePriceCents Int? // MARGIN lines: purchase price, base of the margin VAT
+  vatMode            DealVatMode
+  vatRateBp          Int
+  lineExclVatCents   Int
+  vatCents           Int
+  lineInclVatCents   Int
+  catalogueOptionId  String?
+  addOnProductId     String?
+  quote              Quote        @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@unique([quoteId, lineNo])
+  @@map("deal_line")
+}
+
+/// Appraisal of the customer's car taken in part-exchange. At order confirmation it becomes a VO in INTAKE.
+model TradeInAppraisal {
+  id                   String    @id @default(cuid())
+  quoteId              String    @unique
+  vehicleId            String? // the customer's car if already known, then the VO record
+  vin                  String
+  registration         String?
+  make                 String
+  model                String
+  version              String
+  firstRegistration    DateTime? @db.Date
+  mileage              Int
+  fuel                 FuelType
+  marketValueCents     Int
+  estimatedRepairCents Int       @default(0)
+  offerCents           Int
+  notes                String?
+  quote                Quote     @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  vehicle              Vehicle?  @relation(fields: [vehicleId], references: [id])
+
+  @@map("trade_in_appraisal")
+}
+
+enum FinancingKind {
+  LOAN
+  LEASE
+}
+
+model FinancingPlan {
+  id                    String        @id @default(cuid())
+  quoteId               String        @unique
+  kind                  FinancingKind
+  lender                String
+  depositCents          Int
+  principalCents        Int
+  aprBp                 Int
+  months                Int
+  residualCents         Int           @default(0)
+  monthlyPaymentCents   Int
+  totalCostCents        Int // cost of credit
+  totalPayableCents     Int
+  dealerCommissionCents Int
+  quote                 Quote         @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@map("financing_plan")
+}
+
+enum SalesOrderStatus {
+  CONFIRMED
+  INVOICED
+  DELIVERED
+  CANCELLED
+}
+
+/// Signed order form (bon de commande). A vehicle is on at most one open order (partial unique index).
+model SalesOrder {
+  id                   String           @id @default(cuid())
+  number               String           @unique
+  quoteId              String           @unique
+  leadId               String
+  siteId               String
+  customerId           String
+  salespersonId        String?
+  vehicleId            String
+  stockType            StockType
+  status               SalesOrderStatus @default(CONFIRMED)
+  orderDate            DateTime         @db.Date
+  expectedDeliveryDate DateTime?        @db.Date
+  totalInclVatCents    Int
+  tradeInCents         Int              @default(0)
+  financedCents        Int              @default(0)
+  frontEndMarginCents  Int              @default(0)
+  backEndMarginCents   Int              @default(0)
+  invoiceId            String?          @unique
+  invoicedOn           DateTime?        @db.Date
+  deliveredOn          DateTime?        @db.Date
+  deliveryMileage      Int?
+  cancelledOn          DateTime?        @db.Date
+  cancelReason         String?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  quote                Quote            @relation(fields: [quoteId], references: [id])
+  lead                 Lead             @relation(fields: [leadId], references: [id])
+  site                 Site             @relation(fields: [siteId], references: [id])
+  customer             Customer         @relation(fields: [customerId], references: [id])
+  salesperson          User?            @relation("OrderSalesperson", fields: [salespersonId], references: [id])
+  vehicle              Vehicle          @relation(fields: [vehicleId], references: [id])
+  invoice              Invoice?         @relation(fields: [invoiceId], references: [id])
+  factoryOrder         FactoryOrder?
+  commission           Commission?
+  voPurchases          VoPurchase[]
+
+  @@index([siteId, status])
+  @@map("sales_order")
+}
+
+enum FactoryOrderStatus {
+  ORDERED
+  IN_TRANSIT
+  ARRIVED
+  CANCELLED
+}
+
+/// VN ordered from the OEM, for a customer order or for stock.
+model FactoryOrder {
+  id                 String             @id @default(cuid())
+  number             String             @unique
+  siteId             String
+  catalogueVersionId String
+  vehicleId          String             @unique
+  salesOrderId       String?            @unique // null = ordered for stock
+  oemReference       String
+  status             FactoryOrderStatus @default(ORDERED)
+  orderedOn          DateTime           @db.Date
+  expectedOn         DateTime           @db.Date
+  shippedOn          DateTime?          @db.Date
+  arrivedOn          DateTime?          @db.Date
+  createdAt          DateTime           @default(now())
+  site               Site               @relation(fields: [siteId], references: [id])
+  catalogueVersion   CatalogueVersion   @relation(fields: [catalogueVersionId], references: [id])
+  vehicle            Vehicle            @relation(fields: [vehicleId], references: [id])
+  salesOrder         SalesOrder?        @relation(fields: [salesOrderId], references: [id])
+
+  @@index([siteId, status])
+  @@map("factory_order")
+}
+
+enum ReservationStatus {
+  ACTIVE
+  CONVERTED
+  EXPIRED
+  RELEASED
+}
+
+/// Holds a stock vehicle for a customer for N days. One ACTIVE reservation per vehicle (partial unique index).
+model Reservation {
+  id             String            @id @default(cuid())
+  vehicleId      String
+  siteId         String
+  quoteId        String?
+  customerId     String
+  reservedById   String?
+  previousStatus VehicleStatus
+  reservedOn     DateTime          @db.Date
+  expiresOn      DateTime          @db.Date
+  status         ReservationStatus @default(ACTIVE)
+  closedOn       DateTime?         @db.Date
+  createdAt      DateTime          @default(now())
+  vehicle        Vehicle           @relation(fields: [vehicleId], references: [id])
+  site           Site              @relation(fields: [siteId], references: [id])
+  quote          Quote?            @relation(fields: [quoteId], references: [id])
+  customer       Customer          @relation(fields: [customerId], references: [id])
+
+  @@index([status, expiresOn])
+  @@index([vehicleId])
+  @@map("reservation")
+}
+
+enum CommissionStatus {
+  EARNED
+  PAID
+}
+
+model Commission {
+  id            String           @id @default(cuid())
+  salesOrderId  String           @unique
+  userId        String
+  siteId        String
+  frontEndCents Int
+  addOnCents    Int
+  financeCents  Int
+  amountCents   Int
+  earnedOn      DateTime         @db.Date
+  status        CommissionStatus @default(EARNED)
+  salesOrder    SalesOrder       @relation(fields: [salesOrderId], references: [id])
+  user          User             @relation(fields: [userId], references: [id])
+  site          Site             @relation(fields: [siteId], references: [id])
+
+  @@map("commission")
+}
+
+enum VoPurchaseSource {
+  TRADE_IN
+  PRIVATE
+  PROFESSIONAL
+  OPENING // stock already held when the books were opened
+}
+
+/// How a used vehicle entered stock. Margin-regime VAT base = sale price incl. VAT − priceCents.
+model VoPurchase {
+  id                String               @id @default(cuid())
+  number            String               @unique
+  siteId            String
+  vehicleId         String
+  source            VoPurchaseSource
+  customerId        String? // private seller / trade-in customer
+  supplierId        String? // professional seller
+  salesOrderId      String? // trade-in taken on this order
+  priceCents        Int // purchase price excl. deductible VAT
+  vatCents          Int                  @default(0) // deductible VAT (professional, standard regime)
+  vatRegime         VatRegime // regime of the resale
+  purchaseDate      DateTime             @db.Date
+  supplierReference String?
+  cancelledOn       DateTime?            @db.Date // trade-in handed back when its order was cancelled
+  createdAt         DateTime             @default(now())
+  site              Site                 @relation(fields: [siteId], references: [id])
+  vehicle           Vehicle              @relation(fields: [vehicleId], references: [id])
+  customer          Customer?            @relation(fields: [customerId], references: [id])
+  supplier          Supplier?            @relation(fields: [supplierId], references: [id])
+  salesOrder        SalesOrder?          @relation(fields: [salesOrderId], references: [id])
+  policeEntry       PoliceRegisterEntry?
+
+  @@index([vehicleId])
+  @@map("vo_purchase")
+}
+
+/// Livre de police: register of used vehicles bought and sold, numbered per site.
+model PoliceRegisterEntry {
+  id                 String     @id @default(cuid())
+  number             String     @unique
+  siteId             String
+  vehicleId          String
+  voPurchaseId       String     @unique
+  inDate             DateTime   @db.Date
+  description        String
+  vin                String
+  registration       String?
+  sellerName         String
+  sellerAddress      String?
+  purchasePriceCents Int
+  outDate            DateTime?  @db.Date
+  buyerName          String?
+  buyerAddress       String?
+  salePriceCents     Int?
+  saleReference      String?
+  createdAt          DateTime   @default(now())
+  site               Site       @relation(fields: [siteId], references: [id])
+  vehicle            Vehicle    @relation(fields: [vehicleId], references: [id])
+  voPurchase         VoPurchase @relation(fields: [voPurchaseId], references: [id])
+
+  @@index([siteId, inDate])
+  @@map("police_register_entry")
+}
+
+enum VehicleCostKind {
+  RECONDITIONING
+  TRANSPORT
+  OTHER
+}
+
+/// Costs capitalised into a used vehicle's stock value (purchase price + Σ cost lines).
+model VehicleCostLine {
+  id           String          @id @default(cuid())
+  vehicleId    String
+  kind         VehicleCostKind
+  label        String
+  amountCents  Int // excl. VAT
+  supplierId   String?
+  sourceType   String          @default("MANUAL") // MANUAL, REPAIR_ORDER (Phase 5)
+  sourceId     String?
+  businessDate DateTime        @db.Date
+  createdById  String?
+  createdAt    DateTime        @default(now())
+  vehicle      Vehicle         @relation(fields: [vehicleId], references: [id])
+  supplier     Supplier?       @relation(fields: [supplierId], references: [id])
+
+  @@index([vehicleId])
+  @@map("vehicle_cost_line")
+}
+
+model VoPriceChange {
+  id            String   @id @default(cuid())
+  vehicleId     String
+  oldPriceCents Int?
+  newPriceCents Int
+  reason        String?
+  businessDate  DateTime @db.Date
+  userId        String?
+  createdAt     DateTime @default(now())
+  vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
+
+  @@index([vehicleId])
+  @@map("vo_price_change")
 }

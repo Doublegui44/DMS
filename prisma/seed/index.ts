@@ -1,11 +1,12 @@
 /**
- * Seed — organisation, roles, users, customers, vehicles (v1), accounting (Phase 2).
+ * Seed — organisation, roles, users, customers, vehicles (v1), accounting (Phase 2), sales (Phase 3).
  * Everything business-related goes through the service layer (runCommand + services),
  * so the same rules, numbering, audit and events apply as in the UI.
  *
  * Deterministic: faker.seed(42). Run with `npm run db:seed` (or `npm run db:reset`).
  */
 import { faker } from "@faker-js/faker/locale/fr";
+import "@/modules/register";
 import { db } from "@/lib/db";
 import { runCommand, SYSTEM_ACTOR } from "@/lib/context";
 import { addDays, localToday } from "@/lib/dates";
@@ -22,7 +23,8 @@ import {
 } from "@/modules/core";
 import { createUser, seedRolesAndPermissions, type RoleKey } from "@/modules/admin";
 import { seedAccounting } from "./accounting";
-import { APPROVAL_RULES, BRANDS, COLOURS, SETTINGS, SITES, VN_MODELS, VO_MODELS } from "./data";
+import { salesSeeder } from "./sales";
+import { APPROVAL_RULES, BRANDS, COLOURS, SETTINGS, SITE_SETTINGS, SITES, VN_MODELS, VO_MODELS } from "./data";
 
 export const DEMO_PASSWORD = "demo1234";
 const SEED = 42;
@@ -72,7 +74,7 @@ async function seedOrganisation(today: Date) {
   });
   const brands = new Map<string, string>();
   for (const b of BRANDS) {
-    const brand = await db.brand.create({ data: { code: b.code, name: b.name, groupId: group.id } });
+    const brand = await db.brand.create({ data: { code: b.code, name: b.name, groupId: group.id, wmi: b.wmi } });
     brands.set(b.code, brand.id);
   }
   const sites = new Map<string, string>();
@@ -106,6 +108,9 @@ async function seedOrganisation(today: Date) {
   }
   for (const [key, value] of Object.entries(SETTINGS)) {
     await db.setting.create({ data: { key, value: value as object } });
+  }
+  for (const o of SITE_SETTINGS) {
+    await db.setting.create({ data: { key: o.key, siteId: sites.get(o.site)!, value: o.value as object } });
   }
   await sys((ctx) => setBusinessDate(ctx, today));
   return { groupId: group.id, brands, sites };
@@ -285,7 +290,9 @@ async function seedVehicles(
       }
     }
   };
-  const create = (input: VehicleInput, siteId: string | null) => sys((ctx) => createVehicle(ctx, input), siteId);
+  // Seed v1 stock is created directly, then booked as history by the sales seed (D-044), like the
+  // sales flows that create stock cars in real use (trusted, D-048).
+  const create = (input: VehicleInput, siteId: string | null) => sys((ctx) => createVehicle(ctx, input, { trusted: true }), siteId);
 
   // ── VN stock: ~90 vehicles across sites, matching each site's brands.
   let vnCount = 0;
@@ -421,13 +428,15 @@ export async function seed() {
   await seedUsers(sites);
   const customerIds = await seedCustomers(sites, brands);
   const vehicles = await seedVehicles(today, sites, brands, customerIds);
-  const accounting = await seedAccounting(today, sites, brands, customerIds);
+  const sales = salesSeeder({ today, sites, brands });
+  const accounting = await seedAccounting(today, sites, brands, customerIds, sales.hooks);
   const counts = {
     sites: sites.size,
     users: await db.user.count(),
     customers: await db.customer.count(),
     ...vehicles,
     ...accounting,
+    sales: sales.stats,
     seconds: Math.round((Date.now() - started) / 1000),
   };
   console.log("Seed complete", counts);

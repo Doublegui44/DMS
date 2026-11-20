@@ -2,7 +2,7 @@ import type { ServiceContext } from "@/lib/context";
 import { DomainError, NotFoundError } from "@/lib/errors";
 import { parseInput } from "@/lib/validation";
 import { nextDocumentNumber } from "@/modules/core";
-import { journalForMethod, treasuryKey } from "../domain/default-chart";
+import { journalForMethod, treasuryIsCounterparty, treasuryKey } from "../domain/default-chart";
 import { buildPaymentEntry } from "../domain/entry";
 import { paymentInputSchema, type PaymentInput } from "../schemas/accounting";
 import { settledStatus } from "./invoices";
@@ -15,11 +15,21 @@ declare module "@/lib/events" {
   }
 }
 
+export interface PaymentOptions {
+  /** The calling module checked its own permission. */
+  trusted?: boolean;
+  /**
+   * Counterpart account key instead of the party's receivable/payable (trusted callers only),
+   * e.g. PRIVATE_SELLER when paying a private individual for a used car.
+   */
+  counterKey?: string;
+}
+
 /**
  * Record a receipt (IN) or a disbursement (OUT), post it to the treasury journal, optionally
  * allocate it to open invoices / credit notes, then letter what is fully settled.
  */
-export async function recordPayment(ctx: ServiceContext, input: PaymentInput, opts: { trusted?: boolean } = {}) {
+export async function recordPayment(ctx: ServiceContext, input: PaymentInput, opts: PaymentOptions = {}) {
   const data = parseInput(paymentInputSchema, input);
   if (!opts.trusted) ctx.require("accounting.payment", "create", data.siteId);
   const site = await ctx.tx.site.findUniqueOrThrow({ where: { id: data.siteId } });
@@ -33,6 +43,11 @@ export async function recordPayment(ctx: ServiceContext, input: PaymentInput, op
     const s = await ctx.tx.supplier.findUnique({ where: { id: data.supplierId! } });
     if (!s) throw new NotFoundError("Supplier", data.supplierId!);
     party = { type: "SUPPLIER", id: s.id, name: s.name, accountKey: s.isOem ? "PAYABLE_OEM" : "PAYABLE_SUPPLIER" };
+  }
+  if (opts.counterKey) {
+    if (!opts.trusted) throw new DomainError("counter_key", "Only trusted callers can choose the counterpart account");
+    if (data.allocations.length) throw new DomainError("counter_key", "A payment on another account cannot settle invoices");
+    party = { ...party, accountKey: opts.counterKey };
   }
 
   const number = await nextDocumentNumber(ctx, {
@@ -53,6 +68,8 @@ export async function recordPayment(ctx: ServiceContext, input: PaymentInput, op
       amountCents: data.amountCents,
       businessDate: ctx.businessDate,
       reference: data.reference,
+      sourceType: data.sourceType ?? null,
+      sourceId: data.sourceId ?? null,
       createdById: ctx.actor.userId,
     },
   });
@@ -66,6 +83,7 @@ export async function recordPayment(ctx: ServiceContext, input: PaymentInput, op
       direction: data.direction,
       journalCode,
       treasury: { key: treasuryKey(data.method) },
+      treasuryParty: treasuryIsCounterparty(data.method) ? { type: party.type, id: party.id } : null,
       party,
       amountCents: data.amountCents,
     }),
@@ -95,10 +113,15 @@ export async function recordPayment(ctx: ServiceContext, input: PaymentInput, op
 }
 
 /** Allocate (part of) an existing payment to open invoices of the same customer. */
-export async function allocatePayment(ctx: ServiceContext, paymentId: string, allocations: { invoiceId: string; amountCents: number }[]) {
+export async function allocatePayment(
+  ctx: ServiceContext,
+  paymentId: string,
+  allocations: { invoiceId: string; amountCents: number }[],
+  opts: { trusted?: boolean } = {},
+) {
   const payment = await ctx.tx.payment.findUnique({ where: { id: paymentId } });
   if (!payment) throw new NotFoundError("Payment", paymentId);
-  ctx.require("accounting.payment", "create", payment.siteId);
+  if (!opts.trusted) ctx.require("accounting.payment", "create", payment.siteId);
   await applyAllocations(ctx, paymentId, allocations);
   await letterSettlement(ctx, allocations.map((a) => a.invoiceId));
   await ctx.audit({ action: "payment.allocate", entityType: "Payment", entityId: paymentId, siteId: payment.siteId, after: { allocations } });

@@ -4,17 +4,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
-  BarChart3, Banknote, BookOpen, BookText, BookUser, Boxes, Car, CarFront, CalendarDays, ClipboardList, FlaskConical,
+  BarChart3, Banknote, BookOpen, BookText, BookUser, Boxes, Car, CarFront, CalendarDays, ClipboardCheck, ClipboardList, Factory, FlaskConical,
   History, KanbanSquare, KeyRound, LayoutDashboard, ListTree, Lock, Package, Receipt, Settings, ShieldCheck,
-  Scale, ShoppingCart, Timer, Truck, UserCog, Users, Wrench, type LucideIcon,
+  Scale, ScrollText, ShoppingCart, Timer, Truck, UserCog, Users, Wrench, type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { NavGroup } from "./nav";
 
 const ICONS: Record<string, LucideIcon> = {
-  BarChart3, Banknote, BookOpen, BookText, BookUser, Boxes, Car, CarFront, CalendarDays, ClipboardList, FlaskConical,
+  BarChart3, Banknote, BookOpen, BookText, BookUser, Boxes, Car, CarFront, CalendarDays, ClipboardCheck, ClipboardList, Factory, FlaskConical,
   History, KanbanSquare, KeyRound, LayoutDashboard, ListTree, Lock, Package, Receipt, Settings, ShieldCheck,
-  Scale, ShoppingCart, Timer, Truck, UserCog, Users, Wrench,
+  Scale, ScrollText, ShoppingCart, Timer, Truck, UserCog, Users, Wrench,
 };
 
 export function Sidebar({ groups }: { groups: NavGroup[] }) {

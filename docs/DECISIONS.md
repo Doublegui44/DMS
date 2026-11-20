@@ -84,10 +84,76 @@ Lettering follows settlement: after a payment allocation or a credit note, `lett
 Monthly periods are created on first use (`ensurePeriod`) and by the seed. Locking requires: period open, every earlier period that holds entries locked, the business date past month end, and the period's trial balance balanced; draft invoices only warn. `lockedAt` records the business date. Reopening needs `accounting.period:delete` (admin only), a reason, and no later locked period.
 
 ## D-028 — Accounting seed: opening entry plus light history
-Until vehicle purchases are posted (Phase 3) and the simulator generates history (Phase 7, D-010), the seed posts an opening entry per site (journal AN) at the start of the six-month window: current VN/VO stock values on 371000/372000 (so 37x equals the vehicle sub-ledger), bank and capital, difference to 110000. It then generates workshop and warranty invoices, receipts, rent and salaries day by day through the services, and locks every month except the last finished one.
+Until vehicle purchases are posted (Phase 3) and the simulator generates history (Phase 7, D-010), the seed posts an opening entry per site (journal AN) at the start of the six-month window: current VN/VO stock values on 371000/372000 (so 37x equals the vehicle sub-ledger), bank and capital, difference to 110000. It then generates workshop and warranty invoices, receipts, rent and salaries day by day through the services, and locks every month except the last finished one. The stock part is superseded by D-044: the opening entry now holds only the stock present at the opening.
 
 ## D-029 — Dynamic-line forms call server actions with plain objects
 Manual entries, invoices and payments have a variable number of lines, so these forms are client components that pass a typed object to the server action instead of `FormData`. The action only converts euro strings to cents (`parseEuros`); validation stays in the service (D-018 still applies to fixed forms).
 
 ## D-030 — Preview against the e2e database
 `.claude/launch.json` has a `dms-e2e-preview` server (`.next-preview`, `.env.e2e`) to look at screens with seeded data without resetting `dms_dev`. Playwright resets `dms_e2e` on every run, so stop the preview before running e2e tests.
+
+## D-031 — Cross-module handlers and one registration module
+Handlers registered with `on(type, handler)` run inside the emitting command's transaction. Every module's registrations live in `src/modules/register.ts`, imported for its side effect by `src/lib/session.ts`, the seed, CLI scripts and the integration tests. `runCommand` refuses to run before that import has happened, so a missing import fails loudly instead of silently skipping postings. First handlers: accounting turns `VehicleStockMoved` into 37x/603x entries, and sales expires reservations and quotes on `BusinessDayAdvanced`.
+
+## D-032 — Vehicle stock values move only through core
+`moveVehicleStock` (core) is the only way a stock value changes. `IN` sets the value (arrival or purchase cost), `COST` adds a capitalised cost (reconditioning, transport), and `OUT` books the current value as cost of sale. It publishes `VehicleStockMoved`, which accounting posts (D-031). Sales never writes 37x directly, so the GL stock accounts equal the stock sub-ledger by construction (`expectStockLedgerMatchesGl` in the integration tests).
+
+## D-033 — Trade-in: a VO purchase at signature, settled at invoicing
+When the customer signs, the trade-in enters VO stock (INTAKE, margin regime, police register) and is booked as a purchase from the customer at the offer: Dr 607200 / Cr 467400 (party = customer), and Dr 372000 / Cr 603720. At invoicing, a `TRADE_IN` payment (Dr 467400 / Cr 411000) settles that much of the invoice, so the customer's account shows the real flows. If the order is cancelled before invoicing and the car is untouched, everything is reversed and the car goes back to its owner. An offer above market value minus repairs (over-allowance) counts as discount for approval.
+
+## D-034 — VAT per invoice line, margin regime, pass-through lines
+Each invoice line carries its own VAT treatment, so one invoice can mix a taxable car, add-ons and pass-through fees:
+- **Standard rate:** the usual case.
+- **Margin regime:** used cars bought without VAT. VAT = (price incl. VAT − purchase cost) × rate / (1 + rate), and reconditioning is not deducted (assumption 5).
+- **No VAT:** amounts passed through to the state, such as the registration certificate (467100) and the eco malus (447100).
+
+## D-035 — OEM incentive, financing, add-on costs
+- **OEM incentive:** optionally passed to the customer as a negative line on the VN deal, and claimed from the OEM on a separate invoice (411100 / 707100) when the order is invoiced.
+- **Financing:** at invoicing, a `FINANCE_COMPANY` payment moves the financed amount from the customer (411000) to the lender (467300). The dealer's commission is booked as back-end revenue (Dr 467300 / Cr 706600).
+- **Add-ons and accessories:** their costs are accrued at invoicing (Dr 604100 / 607400, Cr 408100) until the provider's invoice arrives.
+
+## D-036 — Discount approval
+Approval rules are data (`ApprovalRule`: threshold in basis points and approver role), seeded from assumption 7: above 5 % the Sales Manager, above 10 % the Dealer Principal. The effective discount is the dealer discount plus the trade-in over-allowance, over the list price incl. VAT. A quote above a threshold goes to PENDING_APPROVAL instead of SENT. The approver can be the rule's role, any role with a higher threshold, or an admin, but never the requester. Revising the quote withdraws the request.
+
+## D-037 — Reservations and double-sale prevention
+A stock vehicle can be reserved for a quote. A partial unique index allows one ACTIVE reservation per vehicle, and reservations expire after the `sales.reservationDays` setting (default 7) through the day-change handler. A vehicle also has at most one open order (CONFIRMED or INVOICED), checked in `acceptQuote` and enforced by a second partial unique index, so concurrent commands cannot sell it twice. Cancelling an order puts the vehicle back on sale.
+
+## D-038 — Factory orders
+A configured VN is ordered from the OEM when the customer signs. `placeFactoryOrder` creates the vehicle (ORDERED) and the factory order (CU series), with ETA = order date + the version's lead time; stock orders take the same path without a customer. The OEM reference is derived from our number. On arrival, `receiveVehicle` books the OEM invoice (Dr 607100 + 445660 / Cr 401100) and the stock entry. Until then the order cannot be invoiced (`canInvoiceOrder` requires the car to be physically in stock).
+
+## D-039 — Purchases book the supplier side directly
+VN arrivals, VO purchases from traders and capitalised VO costs book the supplier's invoice from the operational event, with the supplier reference stored on the purchase or cost line. There is no separate supplier-invoice document yet: supplier invoices and their matching arrive with purchasing in Phase 4.
+
+## D-040 — Police register
+Every VO entry (trade-in, private seller, trader) creates a police-register entry, numbered per site, with the seller's identity. The VO sale invoice fills in the exit: buyer, date, price and invoice number. The register is read-only in the UI and exports to CSV.
+
+## D-041 — Deposits are payments on account
+A deposit is a customer payment on account (`sourceType` SALES_ORDER) that is allocated to the invoice when the order is invoiced; a cancelled order leaves it on account for a refund. Recording money from the order screen needs `accounting.payment:create` on top of `sales.order:edit`.
+
+## D-042 — Quote builder: a client draft priced on the server
+The builder is a client component that holds a draft. Each change triggers `previewQuoteAction` (debounced 350 ms), which runs the same pricing service as saving inside a command that writes nothing. The totals, margins and approval level shown are therefore exactly what will be saved. Helpers shared with server pages live in `quotes/draft.ts` (no `"use client"`), because server components cannot call functions exported from a client module.
+
+## D-043 — Pipeline board without drag-and-drop
+A card's column is derived from the lead stage and the quote and order status. Every move is a business action with guards (approval, reservation, payment), so cards link to the lead or order instead of being draggable.
+
+## D-044 — Sales seed inside the accounting history
+- **Interleaving:** the sales history runs inside the accounting seed's day loop through `HistoryHooks`, so document numbers stay chronological.
+- **Determinism:** it uses its own Faker instance (seed 4242), so earlier seed data stays identical, plus deterministic VIN and plate generators.
+- **Real permissions:** commands run as the sites' own users, so permissions, approvals and commissions are real. A refused business step is skipped and counted.
+- **Open pipeline:** tasks dated on or after the business date never run, which leaves a live pipeline.
+- **Seed v1 stock:** it becomes history. Cars on order get their factory order on their order date. Cars that arrived or were bought after the opening are booked on their stock-in date through seed-only services (`registerPastArrival`, `registerPastVoPurchase`). The opening balance therefore holds only stock present at the opening (none with the current data), and share capital is €300k so 110000 stays a credit balance. This supersedes the stock part of D-028.
+
+## D-045 — Settings merge order
+`getSetting(key, siteId)` merges objects key by key: code default, then group value, then site override. A site can override one field of a group setting without restating the others.
+
+## D-046 — Field errors carry their full path
+`parseInput` reports nested errors under their full path (for example `tradeIn.offerCents`), so forms with nested sections show each error next to its own field.
+
+## D-047 — Stale sessions after a reseed
+A JWT can outlive its user, for example after a reseed. The login page redirects to the dashboard only if the session's user still exists and is active; otherwise it shows the form. This breaks the /login ↔ /dashboard redirect loop.
+
+## D-048 — Stock cars move only through their business flow
+Until Phase 3, the vehicle screens could set a VN to IN_STOCK by hand. Now that an arrival books the OEM invoice and the stock entry, that shortcut would put a car on the books with no entry behind it, and 37x would drift from the stock sub-ledger. So:
+- **Creation:** `createVehicle` called from a screen accepts only customer cars. New cars enter stock through a factory order, used cars through a purchase or a trade-in. The seed creates its v1 stock as a trusted caller and books it as history (D-044).
+- **Status and commercial data:** `changeVehicleStatus` and `patchVehicle` refuse callers that are not `trusted` (ConflictError). Only the sales flows call them, in the command that books the matching effects. The vehicle page keeps the status history and links a stock car to its sales page.
+- **Edits:** `updateVehicle` still corrects descriptive fields (VIN, plate, version, mileage…). On a stock car it keeps the site, brand, owner, list price and VAT regime, which drive the per-site stock accounts, the OEM account, the VAT treatment and the discount approvals (D-036). VO prices change through repricing. Moving a car to another site needs a transfer flow, deferred.

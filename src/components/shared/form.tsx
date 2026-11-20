@@ -84,7 +84,7 @@ export function Field({
 }
 
 export const inputClass =
-  "h-8 w-full rounded-md border bg-background px-2.5 text-[13px] outline-none focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive";
+  "h-8 w-full rounded-md border bg-background px-2.5 text-[13px] outline-none focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground";
 
 export function NativeSelect({
   name,
@@ -92,6 +92,7 @@ export function NativeSelect({
   options,
   placeholder,
   invalid,
+  className,
   ...rest
 }: {
   name: string;
@@ -107,7 +108,7 @@ export function NativeSelect({
       // Controlled when the caller passes `value`; React rejects both props at once.
       {...(rest.value === undefined ? { defaultValue: defaultValue ?? "" } : {})}
       aria-invalid={invalid || undefined}
-      className={inputClass}
+      className={cn(inputClass, className)}
       {...rest}
     >
       {placeholder !== undefined && <option value="">{placeholder}</option>}
@@ -120,6 +121,6 @@ export function NativeSelect({
   );
 }
 
-export function TextInput({ name, invalid, ...rest }: { name: string; invalid?: boolean } & React.ComponentProps<"input">) {
-  return <input id={name} name={name} aria-invalid={invalid || undefined} className={inputClass} {...rest} />;
+export function TextInput({ name, invalid, className, ...rest }: { name: string; invalid?: boolean } & React.ComponentProps<"input">) {
+  return <input id={name} name={name} aria-invalid={invalid || undefined} className={cn(inputClass, className)} {...rest} />;
 }

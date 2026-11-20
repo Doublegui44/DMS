@@ -187,6 +187,24 @@ describe("entry builders always balance", () => {
     expect(() => buildPaymentEntry({ ...base, amountCents: 0, direction: "IN", party: { type: "CUSTOMER", id: "c", name: "", accountKey: "R" } })).toThrow();
   });
 
+  it("a trade-in settles the customer's car account against their receivable", () => {
+    const e = buildPaymentEntry({
+      id: "p2",
+      number: "P2",
+      siteId: "s1",
+      date: new Date("2026-03-11"),
+      journalCode: "OD",
+      amountCents: 12_345,
+      direction: "IN",
+      treasury: { key: "TREASURY_TRADE_IN" },
+      treasuryParty: { type: "CUSTOMER", id: "c1" },
+      party: { type: "CUSTOMER", id: "c1", name: "X", accountKey: "RECEIVABLE_CUSTOMER" },
+    });
+    expectBalanced(e);
+    expect(e.lines[0]).toMatchObject({ account: { key: "TREASURY_TRADE_IN" }, debitCents: 12_345, partyType: "CUSTOMER", partyId: "c1" });
+    expect(e.lines[1]).toMatchObject({ creditCents: 12_345, partyId: "c1" });
+  });
+
   it("reversal mirrors every line", () => {
     const lines: ResolvedLine[] = [
       { accountCode: "411000", debitCents: 1_000, creditCents: 0, label: "x", partyType: "CUSTOMER", partyId: "c1" },

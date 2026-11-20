@@ -38,20 +38,24 @@ Each phase ends with: migrations applied, seed updated, tests green, app running
 - **Done when:** unit tests prove every entry balances and locked periods reject postings → `tests/unit/accounting-domain.test.ts`, `tests/integration/accounting.test.ts`, `tests/e2e/accounting.spec.ts`
 - Deferred: account-mapping editor UI (service `setAccountMapping` exists), supplier invoices (arrive with purchasing in Phases 3–4), FEC/VAT reports (Phase 6), payment cancellation.
 
-## Phase 3 — VN / VO sales
-- [ ] OEM catalogue (models, versions, options, list prices), configurator
-- [ ] Lead → Quote → Order → Delivery → Invoice; kanban + list
-- [ ] Deal structure: options, accessories, discount, OEM incentives, eco bonus/malus, registration fees, add-ons
-- [ ] Financing/lease calculator (monthly payment, total cost), dealer commission
-- [ ] Front-end / back-end margin, salesperson commission
-- [ ] Approval thresholds on discounts
-- [ ] Reservation with expiry, double-sale prevention, cancellation releases the vehicle, delivery payment check
-- [ ] Factory order with ETA; VN stock arrival
-- [ ] Trade-in appraisal → VO `intake`, VO purchase (private / professional), police register
-- [ ] VO stock: cost build-up, ageing alerts 60/90/120, repricing; VO sale under margin VAT
-- [ ] Posting handlers for all sales events
-- [ ] Tests: pricing, VAT, margin VAT, margins, APR, commission; **e2e flow 1**
-- **Done when:** Flow 1 e2e passes
+## Phase 3 — VN / VO sales ✅
+- [x] OEM catalogue (models, versions, options, fictional list prices, dealer cost, OEM incentive, lead time), configurator in the quote builder
+- [x] Lead → Quote → Order → Invoice → Delivery; pipeline board (derived stages, D-043) + list, orders list, CSV exports
+- [x] Deal structure: options, accessories, add-on products, discount, OEM incentive, eco bonus (advanced by the dealer) / malus, registration certificate (pass-through, no VAT)
+- [x] Financing (loan / lease with residual): monthly payment, cost of credit, dealer commission booked at invoicing
+- [x] Front-end / back-end margins and salesperson commission (assumption 9), shown in the builder's dealer view and on the order
+- [x] Discount approval: rules as data, effective discount incl. trade-in over-allowance, no self-approval (D-036)
+- [x] Reservation with expiry, double-sale prevention (partial unique indexes), cancellation releases the vehicle and hands the trade-in back, delivery requires a settled invoice
+- [x] Factory orders (customer and stock) with ETA, shipping, arrival booking the OEM invoice and the stock entry
+- [x] Trade-in → VO intake at signature, VO purchases (private / trader, margin or standard VAT), police register
+- [x] VO stock: capitalised costs, reconditioning → for sale, ageing alerts 60/90/120, repricing with history, sale under margin VAT
+- [x] Stock cars move only through the sales flows: the vehicle screens register customers' cars and correct descriptive data (D-048)
+- [x] Postings: sale invoices, cost of sale through `VehicleStockMoved` (D-031/D-032), trade-in, deposits, finance company, finance commission, OEM incentive claim, add-on cost accruals
+- [x] Dashboard sales KPIs; screens: pipeline, lead, quote builder (live server-side preview, D-042), quote, order, VN stock + vehicle, VO stock + vehicle + purchase, police register, catalogue
+- [x] Seed: catalogue, add-ons, VO suppliers; six months of deals, stock orders, VO purchases and reconditioning run inside the accounting history (D-044); seed v1 stock replayed so the books match the stock on every date
+- [x] Tests: pricing, VAT, margin VAT, margins, APR, commission, fees, workflow guards (unit); Flow 1, double sale, reservations, approvals, factory orders, VO purchases, cancellation, settings, seed replay (integration); **e2e Flow 1**
+- **Done when:** Flow 1 e2e passes → `tests/e2e/sales.spec.ts` (lead → quote with trade-in → order → invoice → payment → delivery; trade-in in VO intake; VN stock down by its cost and VO stock up by the offer on the trial balance; sale, cost-of-sale, trade-in and receipt entries present)
+- Deferred: supplier invoices and payments (OEM and traders stay unpaid in 401, D-039 → Phase 4), lender payout clearing 467300, order and invoice PDFs (Phase 6), VO reconditioning through workshop repair orders (Phase 5), sales and stock reports (Phase 6), editing approval rules and catalogue in the UI, transferring a stock car to another site (D-048).
 
 ## Phase 4 — Parts
 - [ ] Catalogue, supersessions, discount codes × price class

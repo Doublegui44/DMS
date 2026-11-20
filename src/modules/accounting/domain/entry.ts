@@ -145,7 +145,16 @@ export interface InvoiceForPosting {
   receivableKey: string;
   vatRegime: "STANDARD" | "MARGIN";
   totalInclVatCents: Cents;
-  lines: { label: string; lineExclVatCents: Cents; vatCents: Cents; vatRateCode: string; departmentCode: DepartmentCode; revenueKey: string }[];
+  lines: {
+    label: string;
+    lineExclVatCents: Cents;
+    vatCents: Cents;
+    vatRateCode: string;
+    departmentCode: DepartmentCode;
+    revenueKey: string;
+    /** Defaults to the invoice regime. */
+    vatRegime?: "STANDARD" | "MARGIN";
+  }[];
 }
 
 /**
@@ -167,7 +176,7 @@ export function buildInvoiceEntry(inv: InvoiceForPosting, journalCode = "VE"): E
   for (const l of inv.lines) {
     lines.push({ account: { key: l.revenueKey }, debitCents: 0, creditCents: l.lineExclVatCents, label, departmentCode: l.departmentCode });
     if (l.vatCents !== 0) {
-      const vatKey = inv.vatRegime === "MARGIN" ? "VAT_COLLECTED_MARGIN" : `VAT_COLLECTED_${l.vatRateCode}`;
+      const vatKey = (l.vatRegime ?? inv.vatRegime) === "MARGIN" ? "VAT_COLLECTED_MARGIN" : `VAT_COLLECTED_${l.vatRateCode}`;
       lines.push({ account: { key: vatKey }, debitCents: 0, creditCents: l.vatCents, label });
     }
   }
@@ -193,6 +202,11 @@ export interface PaymentForPosting {
   direction: "IN" | "OUT";
   journalCode: string;
   treasury: AccountRef; // bank / cash / finance-company account
+  /**
+   * Set when the treasury side is itself a third-party account: a trade-in settles what the
+   * dealer owes the customer for their car (467400) against what the customer owes (411).
+   */
+  treasuryParty?: { type: PartyType; id: string } | null;
   party: { type: PartyType; id: string; name: string; accountKey: string };
   amountCents: Cents;
 }
@@ -201,7 +215,13 @@ export interface PaymentForPosting {
 export function buildPaymentEntry(p: PaymentForPosting): EntryDraft {
   if (p.amountCents <= 0) throw new RangeError("Payment amount must be positive");
   const label = `${p.direction === "IN" ? "Receipt" : "Payment"} ${p.number} ${p.party.name}`.slice(0, 120);
-  const treasuryLine: DraftLine = { account: p.treasury, debitCents: 0, creditCents: 0, label };
+  const treasuryLine: DraftLine = {
+    account: p.treasury,
+    debitCents: 0,
+    creditCents: 0,
+    label,
+    ...(p.treasuryParty ? { partyType: p.treasuryParty.type, partyId: p.treasuryParty.id } : {}),
+  };
   const partyLine: DraftLine = {
     account: { key: p.party.accountKey },
     debitCents: 0,
@@ -225,6 +245,90 @@ export function buildPaymentEntry(p: PaymentForPosting): EntryDraft {
     sourceType: "PAYMENT",
     sourceId: p.id,
     lines: p.direction === "IN" ? [treasuryLine, partyLine] : [partyLine, treasuryLine],
+  };
+}
+
+/**
+ * Vehicle stock movement (perpetual inventory, D-005), journal OD.
+ * IN / COST: Dr 37x stock / Cr 603x stock variation · OUT: Dr 603x / Cr 37x.
+ */
+export function buildStockMovementEntry(m: {
+  siteId: string;
+  date: Date;
+  stockType: "VN" | "VO";
+  movement: "IN" | "COST" | "OUT";
+  amountCents: Cents;
+  label: string;
+  sourceType: string;
+  sourceId: string | null;
+}): EntryDraft {
+  if (!Number.isSafeInteger(m.amountCents) || m.amountCents <= 0) throw new RangeError("Stock movement must be positive");
+  const label = m.label.slice(0, 120);
+  const stock: DraftLine = { account: { key: `STOCK_${m.stockType}` }, debitCents: 0, creditCents: 0, label };
+  const variation: DraftLine = {
+    account: { key: `STOCK_VARIATION_${m.stockType}` },
+    debitCents: 0,
+    creditCents: 0,
+    label,
+    departmentCode: m.stockType,
+  };
+  if (m.movement === "OUT") {
+    variation.debitCents = m.amountCents;
+    stock.creditCents = m.amountCents;
+  } else {
+    stock.debitCents = m.amountCents;
+    variation.creditCents = m.amountCents;
+  }
+  return {
+    journalCode: "OD",
+    siteId: m.siteId,
+    entryDate: m.date,
+    label,
+    sourceType: m.sourceType,
+    sourceId: m.sourceId,
+    lines: m.movement === "OUT" ? [variation, stock] : [stock, variation],
+  };
+}
+
+/**
+ * Purchase or cost accrual: Dr expense lines (with department) + Dr deductible VAT / Cr one counterpart
+ * (supplier payable, private seller, goods-received-not-invoiced…). Journal AC by default.
+ */
+export function buildPurchaseEntry(p: {
+  siteId: string;
+  date: Date;
+  label: string;
+  sourceType: string;
+  sourceId: string | null;
+  journalCode?: string;
+  lines: { account: AccountRef; amountCents: Cents; departmentCode: DepartmentCode }[];
+  vatCents?: Cents;
+  credit: { account: AccountRef; partyType?: PartyType | null; partyId?: string | null };
+}): EntryDraft {
+  const label = p.label.slice(0, 120);
+  const vat = p.vatCents ?? 0;
+  if (p.lines.some((l) => !Number.isSafeInteger(l.amountCents)) || !Number.isSafeInteger(vat) || vat < 0) {
+    throw new RangeError("Amounts must be integer cents");
+  }
+  const total = sumCents(p.lines.map((l) => l.amountCents)) + vat;
+  if (total <= 0) throw new RangeError("A purchase must be positive");
+  const lines: DraftLine[] = p.lines.map((l) => ({
+    account: l.account,
+    debitCents: l.amountCents,
+    creditCents: 0,
+    label,
+    departmentCode: l.departmentCode,
+  }));
+  if (vat > 0) lines.push({ account: { key: "VAT_DEDUCTIBLE_GOODS" }, debitCents: vat, creditCents: 0, label });
+  lines.push({ account: p.credit.account, debitCents: 0, creditCents: total, label, partyType: p.credit.partyType ?? null, partyId: p.credit.partyId ?? null });
+  return {
+    journalCode: p.journalCode ?? "AC",
+    siteId: p.siteId,
+    entryDate: p.date,
+    label,
+    sourceType: p.sourceType,
+    sourceId: p.sourceId,
+    lines: compactLines(lines),
   };
 }
 

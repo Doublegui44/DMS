@@ -86,8 +86,3 @@ export const vehicleInputSchema = z
   });
 
 export type VehicleInput = z.input<typeof vehicleInputSchema>;
-
-export const vehicleStatusChangeSchema = z.object({
-  status: vehicleInputSchema.innerType().shape.status,
-  reason: optionalText,
-});

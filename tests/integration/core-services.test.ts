@@ -1,14 +1,23 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { runCommand } from "@/lib/context";
-import { on, clearHandlers } from "@/lib/events";
-import { ForbiddenError, InvalidTransitionError, ValidationError } from "@/lib/errors";
-import { changeVehicleStatus, createCustomer, createVehicle, nextDocumentNumber, advanceBusinessDay, setBusinessDate } from "@/modules/core";
-import { db, makeActor, resetWithMinimalOrg, sys } from "./helpers";
+import { on } from "@/lib/events";
+import { ConflictError, ForbiddenError, InvalidTransitionError, ValidationError } from "@/lib/errors";
+import {
+  changeVehicleStatus,
+  createCustomer,
+  createVehicle,
+  nextDocumentNumber,
+  advanceBusinessDay,
+  patchVehicle,
+  setBusinessDate,
+  updateVehicle,
+} from "@/modules/core";
+import { db, makeActor, resetHandlers, resetWithMinimalOrg, sys } from "./helpers";
 
 let org: Awaited<ReturnType<typeof resetWithMinimalOrg>>;
 
 beforeEach(async () => {
-  clearHandlers();
+  resetHandlers();
   org = await resetWithMinimalOrg();
 });
 
@@ -23,6 +32,9 @@ const vnInput = (siteId: string, vin = "VF3AAAAA0T1234567") => ({
   siteId,
   stockValueCents: 1_500_000,
 });
+
+/** The sales flows create and move stock cars (trusted); the vehicle screens cannot (D-048). */
+const flow = { trusted: true } as const;
 
 describe("gap-free numbering", () => {
   it("increments per scope and type", async () => {
@@ -80,44 +92,92 @@ describe("customers", () => {
 
 describe("vehicles", () => {
   it("records the initial status in the history", async () => {
-    const v = await sys((ctx) => createVehicle(ctx, vnInput(org.siteA.id)));
+    const v = await sys((ctx) => createVehicle(ctx, vnInput(org.siteA.id), flow));
     const history = await db.vehicleStatusHistory.findMany({ where: { vehicleId: v.id } });
     expect(history).toHaveLength(1);
     expect(history[0].toStatus).toBe("ORDERED");
   });
 
   it("refuses an initial status outside the stock lifecycle", async () => {
-    await expect(sys((ctx) => createVehicle(ctx, { ...vnInput(org.siteA.id), status: "SOLD" }))).rejects.toBeInstanceOf(ValidationError);
+    await expect(sys((ctx) => createVehicle(ctx, { ...vnInput(org.siteA.id), status: "SOLD" }, flow))).rejects.toBeInstanceOf(ValidationError);
   });
 
   it("enforces unique VIN", async () => {
-    await sys((ctx) => createVehicle(ctx, vnInput(org.siteA.id)));
-    await expect(sys((ctx) => createVehicle(ctx, vnInput(org.siteA.id)))).rejects.toMatchObject({ code: "P2002" });
+    await sys((ctx) => createVehicle(ctx, vnInput(org.siteA.id), flow));
+    await expect(sys((ctx) => createVehicle(ctx, vnInput(org.siteA.id), flow))).rejects.toMatchObject({ code: "P2002" });
   });
 
   it("moves along the lifecycle and sets the stock-in date on arrival", async () => {
-    const v = await sys((ctx) => createVehicle(ctx, vnInput(org.siteA.id)));
-    await sys((ctx) => changeVehicleStatus(ctx, v.id, "IN_TRANSIT"));
-    const arrived = await sys((ctx) => changeVehicleStatus(ctx, v.id, "IN_STOCK", "Unloaded"), new Date("2026-04-01"));
+    const v = await sys((ctx) => createVehicle(ctx, vnInput(org.siteA.id), flow));
+    await sys((ctx) => changeVehicleStatus(ctx, v.id, "IN_TRANSIT", null, flow));
+    const arrived = await sys((ctx) => changeVehicleStatus(ctx, v.id, "IN_STOCK", "Unloaded", flow), new Date("2026-04-01"));
     expect(arrived.status).toBe("IN_STOCK");
     expect(arrived.stockInDate?.toISOString().slice(0, 10)).toBe("2026-04-01");
     expect(await db.vehicleStatusHistory.count({ where: { vehicleId: v.id } })).toBe(3);
   });
 
   it("rejects an invalid transition and changes nothing", async () => {
-    const v = await sys((ctx) => createVehicle(ctx, vnInput(org.siteA.id)));
-    await expect(sys((ctx) => changeVehicleStatus(ctx, v.id, "DELIVERED"))).rejects.toBeInstanceOf(InvalidTransitionError);
+    const v = await sys((ctx) => createVehicle(ctx, vnInput(org.siteA.id), flow));
+    await expect(sys((ctx) => changeVehicleStatus(ctx, v.id, "DELIVERED", null, flow))).rejects.toBeInstanceOf(InvalidTransitionError);
     expect((await db.vehicle.findUniqueOrThrow({ where: { id: v.id } })).status).toBe("ORDERED");
   });
 
   it("rolls back the whole command when an event handler fails", async () => {
-    const v = await sys((ctx) => createVehicle(ctx, vnInput(org.siteA.id)));
+    const v = await sys((ctx) => createVehicle(ctx, vnInput(org.siteA.id), flow));
     on("VehicleStatusChanged", () => {
       throw new Error("downstream failure");
     });
-    await expect(sys((ctx) => changeVehicleStatus(ctx, v.id, "IN_TRANSIT"))).rejects.toThrow("downstream failure");
+    await expect(sys((ctx) => changeVehicleStatus(ctx, v.id, "IN_TRANSIT", null, flow))).rejects.toThrow("downstream failure");
     expect((await db.vehicle.findUniqueOrThrow({ where: { id: v.id } })).status).toBe("ORDERED");
     expect(await db.auditLog.count({ where: { entityId: v.id, action: "vehicle.status" } })).toBe(0);
+  });
+
+  it("leaves stock cars to the sales flows: no manual creation, status change or commercial edit", async () => {
+    // Created by hand, a car in stock would have a value with no purchase behind it.
+    const err = await sys((ctx) => createVehicle(ctx, { ...vnInput(org.siteA.id), status: "IN_STOCK" })).catch((e) => e);
+    expect(err).toBeInstanceOf(ValidationError);
+    expect((err as ValidationError).fieldErrors.stockType).toBeDefined();
+
+    const v = await sys((ctx) => createVehicle(ctx, { ...vnInput(org.siteA.id), listPriceCents: 2_500_000 }, flow));
+    await expect(sys((ctx) => changeVehicleStatus(ctx, v.id, "IN_STOCK", "By hand"))).rejects.toBeInstanceOf(ConflictError);
+    await expect(sys((ctx) => patchVehicle(ctx, v.id, { stockInDate: new Date("2026-03-15") }))).rejects.toBeInstanceOf(ConflictError);
+
+    // The descriptive fields can be corrected; the site, brand, owner, price and VAT regime stay.
+    const owner = await sys((ctx) => createCustomer(ctx, { kind: "INDIVIDUAL", firstName: "Jeanne", lastName: "Martin" }));
+    const edited = await sys((ctx) =>
+      updateVehicle(ctx, v.id, {
+        ...vnInput(org.siteA.id),
+        colour: "Blue",
+        siteId: org.siteB.id,
+        ownerCustomerId: owner.id,
+        listPriceCents: 100,
+        vatRegime: "MARGIN",
+        stockValueCents: 1,
+      }),
+    );
+    expect(edited).toMatchObject({
+      colour: "Blue",
+      siteId: org.siteA.id,
+      ownerCustomerId: null,
+      listPriceCents: 2_500_000,
+      vatRegime: "STANDARD",
+      stockValueCents: 1_500_000,
+      status: "ORDERED",
+      stockInDate: null,
+    });
+  });
+
+  it("lets the vehicle screens register and edit a customer's car", async () => {
+    const owner = await sys((ctx) => createCustomer(ctx, { kind: "INDIVIDUAL", firstName: "Jeanne", lastName: "Martin" }));
+    const car = await sys((ctx) =>
+      createVehicle(ctx, { ...vnInput(org.siteA.id), stockType: "NONE", status: "CUSTOMER", siteId: null, ownerCustomerId: owner.id }),
+    );
+    expect(car).toMatchObject({ stockType: "NONE", status: "CUSTOMER", stockValueCents: 0, stockInDate: null });
+    const other = await sys((ctx) => createCustomer(ctx, { kind: "INDIVIDUAL", firstName: "Paul", lastName: "Durand" }));
+    const edited = await sys((ctx) =>
+      updateVehicle(ctx, car.id, { ...vnInput(org.siteA.id), stockType: "NONE", status: "CUSTOMER", siteId: org.siteB.id, ownerCustomerId: other.id }),
+    );
+    expect(edited).toMatchObject({ siteId: org.siteB.id, ownerCustomerId: other.id });
   });
 });
 
@@ -131,10 +191,17 @@ describe("permissions", () => {
 
   it("scopes a site role to its site", async () => {
     const actor = await makeActor("SALES_MANAGER", org.siteA.id);
-    const ok = await runCommand({ actor, siteId: org.siteA.id }, (ctx) => createVehicle(ctx, vnInput(org.siteA.id)));
+    const owner = await sys((ctx) => createCustomer(ctx, { kind: "INDIVIDUAL", firstName: "Jeanne", lastName: "Martin" }));
+    const customerCar = (siteId: string, vin?: string) => ({
+      ...vnInput(siteId, vin),
+      stockType: "NONE" as const,
+      status: "CUSTOMER" as const,
+      ownerCustomerId: owner.id,
+    });
+    const ok = await runCommand({ actor, siteId: org.siteA.id }, (ctx) => createVehicle(ctx, customerCar(org.siteA.id)));
     expect(ok.siteId).toBe(org.siteA.id);
     await expect(
-      runCommand({ actor, siteId: org.siteB.id }, (ctx) => createVehicle(ctx, vnInput(org.siteB.id, "VF3AAAAA0T7654321"))),
+      runCommand({ actor, siteId: org.siteB.id }, (ctx) => createVehicle(ctx, customerCar(org.siteB.id, "VF3AAAAA0T7654321"))),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 

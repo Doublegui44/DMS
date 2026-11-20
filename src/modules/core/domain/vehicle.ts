@@ -90,8 +90,8 @@ const TRANSITIONS: Record<VehicleStatus, VehicleStatus[]> = {
   ORDERED: ["IN_TRANSIT", "IN_STOCK", "RESERVED"],
   IN_TRANSIT: ["IN_STOCK", "RESERVED"],
   IN_STOCK: ["RESERVED", "SOLD"],
-  INTAKE: ["RECONDITIONING", "FOR_SALE"],
-  RECONDITIONING: ["FOR_SALE"],
+  INTAKE: ["RECONDITIONING", "FOR_SALE", "CUSTOMER"], // CUSTOMER: trade-in handed back (order cancelled)
+  RECONDITIONING: ["FOR_SALE", "RESERVED"], // a car can be sold while still being prepared
   FOR_SALE: ["RESERVED", "SOLD", "RECONDITIONING"],
   RESERVED: ["SOLD", "IN_STOCK", "FOR_SALE", "ORDERED", "IN_TRANSIT"],
   SOLD: ["DELIVERED", "RESERVED", "IN_STOCK", "FOR_SALE"],
@@ -117,6 +117,7 @@ export function canTransition(from: VehicleStatus, to: VehicleStatus, stockType:
   // Leaving delivery to CUSTOMER changes stock type, everything else must stay in the same lifecycle.
   if (from === "DELIVERED" && to === "CUSTOMER") return true;
   if (from === "CUSTOMER" && to === "INTAKE") return true;
+  if (from === "INTAKE" && to === "CUSTOMER") return stockType === "VO";
   return STATUSES_BY_STOCK[stockType].includes(to);
 }
 
@@ -127,6 +128,42 @@ export function allowedNextStatuses(from: VehicleStatus, stockType: StockType): 
 
 export function isInStock(status: VehicleStatus): boolean {
   return ["IN_STOCK", "INTAKE", "RECONDITIONING", "FOR_SALE", "RESERVED"].includes(status);
+}
+
+/**
+ * Is the vehicle in the dealer's stock *ledger* (valued in 37x)? A VN counts once it has arrived
+ * (`stockInDate` set) and until it is invoiced (SOLD); a VO from intake until it is invoiced.
+ * A RESERVED VN that has not arrived yet is not in stock.
+ */
+export function isPhysicallyInStock(v: { stockType: StockType; status: VehicleStatus; stockInDate: Date | null }): boolean {
+  if (v.stockType === "NONE" || !v.stockInDate) return false;
+  return isInStock(v.status);
+}
+
+/** Statuses counted in the stock ledger (combined with `stockInDate` set). */
+export const STOCK_LEDGER_STATUSES: VehicleStatus[] = ["IN_STOCK", "INTAKE", "RECONDITIONING", "FOR_SALE", "RESERVED"];
+
+// ── Deterministic randomness ─────────────────────────────────
+
+/**
+ * Pseudo-random source in [0, 1) derived from a string (FNV-1a hash + mulberry32).
+ * Services use it to generate VINs or plates from a document number, so that the seed and the
+ * simulator stay deterministic without `Math.random()`.
+ */
+export function seededRandom(seed: string): () => number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  let a = h || 1;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 // ── Stock ageing ─────────────────────────────────────────────

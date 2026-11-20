@@ -51,7 +51,8 @@ export async function createInvoice(ctx: ServiceContext, input: InvoiceInput, op
     const vatRateBp = rates.get(l.vatRateCode);
     if (vatRateBp === undefined) throw new DomainError("unknown_vat_rate", `Unknown VAT rate ${l.vatRateCode}`);
     let amounts: { lineExclVatCents: number; vatCents: number };
-    if (data.vatRegime === "MARGIN") {
+    const lineRegime = l.vatRegime ?? data.vatRegime;
+    if (lineRegime === "MARGIN") {
       if (l.purchasePriceCents === undefined) throw new DomainError("purchase_price_required", "Margin-regime lines need the purchase price");
       amounts = computeMarginLine({ salePriceInclCents: l.unitPriceExclVatCents, purchasePriceCents: l.purchasePriceCents, rateBp: vatRateBp });
     } else {
@@ -65,6 +66,7 @@ export async function createInvoice(ctx: ServiceContext, input: InvoiceInput, op
       discountBp: l.discountBp,
       vatRateCode: l.vatRateCode,
       vatRateBp,
+      vatRegime: lineRegime,
       departmentCode: l.departmentCode,
       revenueKey: l.revenueKey,
       ...amounts,
@@ -139,6 +141,7 @@ export async function issueInvoice(ctx: ServiceContext, id: string, opts: Invoic
         lineExclVatCents: l.lineExclVatCents,
         vatCents: l.vatCents,
         vatRateCode: l.vatRateCode,
+        vatRegime: l.vatRegime,
         departmentCode: l.departmentCode as DepartmentCode,
         revenueKey: l.revenueKey,
       })),
@@ -219,6 +222,7 @@ export async function creditInvoice(ctx: ServiceContext, invoiceId: string, reas
           vatRateCode: l.vatRateCode,
           vatRateBp: l.vatRateBp,
           vatCents: l.vatCents,
+          vatRegime: l.vatRegime,
           departmentCode: l.departmentCode,
           revenueKey: l.revenueKey,
         })),
