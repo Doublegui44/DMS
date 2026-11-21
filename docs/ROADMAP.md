@@ -84,13 +84,15 @@ Each phase ends with: migrations applied, seed updated, tests green, app running
 - **Done when:** Flows 2, 3 and 4 e2e pass → `tests/e2e/workshop.spec.ts`
 - Deferred: consumables as a flat charge (bought as parts for now), RO and claim PDFs (Phase 6), bay-level capacity, editing rates in the UI, workshop reports (Phase 6).
 
-## Phase 6 — Reports, dashboards, PDFs
-- [ ] Trial balance, general ledger, P&L and gross margin by department, stock value, VAT report, ageing balance
-- [ ] FEC export
-- [ ] Role dashboards with KPIs (units sold, VN/VO gross margin, stock ageing, workshop productivity, parts turnover, ageing balance)
-- [ ] PDFs: order form, invoice, credit note, repair order, warranty claim
-- [ ] **e2e flow 6** (month-end close)
-- **Done when:** Flow 6 passes and each role's dashboard shows correct seeded figures
+## Phase 6 — Reports, dashboards, PDFs ✅
+- [x] Trial balance, general ledger, P&L and gross margin by department (D-063), stock value (VN/VO/parts reconciled to 37x), VAT return (D-065), receivables and payables ageing (D-064); CSV exports
+- [x] FEC export (D-066)
+- [x] Role dashboards (D-067): units sold, gross margin by department and by month, stock ageing, workshop productivity, parts turnover, receivables/payables ageing, VAT; charts with a table beside each (D-068)
+- [x] PDFs (D-069): order form, invoice, credit note, repair order, warranty claim
+- [x] Month-end close pack on the periods screen (D-070)
+- [x] Tests: P&L, ageing, VAT, FEC, turnover, dashboard layout, printable documents (unit); reports tie to the ledger, dashboards equal reports per role, documents print from the same figures (integration); **e2e Flow 6**
+- **Done when:** Flow 6 passes and each role's dashboard shows correct seeded figures → `tests/e2e/close.spec.ts` (close pack reviewed, P&L = trial balance result, VAT fully explained, month locked, manual entry in it refused; accountant, dealer principal and technician dashboards checked against the reports; PDFs served)
+- Deferred: balance sheet, editing legal mentions in the UI, French/Spanish PDF wording, e-invoicing formats (Factur-X), emailing documents.
 
 ## Phase 7 — Simulation engine
 - [ ] Scenario runner (service-layer only) with configurable rates; CLI + admin page

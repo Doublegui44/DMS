@@ -99,3 +99,33 @@ export async function getPartsDashboard(ctx: ServiceContext) {
     obsoleteValueCents: obsolete._sum.valueCents ?? 0,
   };
 }
+
+/** Parts consumed at cost over a window (sales, issues to repair orders, net of returns), and stock held now, per site. */
+export async function getPartsConsumption(ctx: ServiceContext, a: { from: Date; to: Date }) {
+  ctx.require("parts.stock", "view");
+  const sites = allowedSites(ctx);
+  const scope = sites ? { siteId: { in: sites } } : {};
+  const [used, held] = await Promise.all([
+    ctx.tx.partMovement.groupBy({
+      by: ["siteId"],
+      where: { ...scope, kind: { in: ["COUNTER_SALE", "ISSUE_RO", "RETURN_RO", "RETURN_CUSTOMER"] }, businessDate: { gte: a.from, lte: a.to } },
+      _sum: { valueCents: true },
+    }),
+    ctx.tx.stockItem.groupBy({ by: ["siteId"], where: scope, _sum: { valueCents: true } }),
+  ]);
+  const siteIds = [...new Set([...used.map((u) => u.siteId), ...held.map((h) => h.siteId)])];
+  return siteIds.map((siteId) => ({
+    siteId,
+    // Outgoing movements carry negative values; returns positive.
+    costOfUseCents: -(used.find((u) => u.siteId === siteId)?._sum.valueCents ?? 0),
+    stockValueCents: held.find((h) => h.siteId === siteId)?._sum.valueCents ?? 0,
+  }));
+}
+
+/** Parts stock sub-ledger per site (Σ stock item values), reconciled with 373 by the stock value report. */
+export async function partsStockLedger(ctx: ServiceContext) {
+  ctx.require("parts.stock", "view");
+  const sites = allowedSites(ctx);
+  const rows = await ctx.tx.stockItem.groupBy({ by: ["siteId"], where: sites ? { siteId: { in: sites } } : {}, _sum: { valueCents: true }, _count: { _all: true } });
+  return rows.map((r) => ({ siteId: r.siteId, valueCents: r._sum.valueCents ?? 0, items: r._count._all }));
+}

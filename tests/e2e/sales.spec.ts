@@ -99,7 +99,8 @@ test.describe("sales", () => {
     // Invoice, payment of the balance, delivery.
     await page.goto(orderUrl);
     await page.getByRole("button", { name: "Invoice", exact: true }).click();
-    const invoiceLink = page.getByRole("link", { name: /[A-Z]{3}-FA-\d{4}-\d{6}/ });
+    // The sale invoice (an OEM incentive claim may add a second FA invoice further down).
+    const invoiceLink = page.getByTestId("order-invoice");
     await expect(invoiceLink).toBeVisible({ timeout: 15_000 });
     const invoiceNumber = (await invoiceLink.innerText()).trim();
 

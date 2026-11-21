@@ -28,7 +28,7 @@ export {
 } from "./services/repair-orders";
 export { clockOn, clockOff } from "./services/clocking";
 export { decideWarrantyClaim, recordWarrantyRemittance } from "./services/warranty";
-export { listRepairOrders, getRepairOrder, getCheckInFormData, getServiceHistory, RO_SORTS } from "./queries/repair-orders";
+export { listRepairOrders, getRepairOrder, getWarrantyClaim, getCheckInFormData, getServiceHistory, RO_SORTS } from "./queries/repair-orders";
 export {
   getPlanner,
   getAppointmentFormData,

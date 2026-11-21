@@ -104,7 +104,9 @@ export default async function TrialBalancePage({ searchParams }: { searchParams:
           </table>
         </Section>
         <Section title={t("result")}>
-          <p className="text-2xl font-semibold tabular-nums">{formatMoney(tb.resultCents)}</p>
+          <p className="text-2xl font-semibold tabular-nums" data-testid="tb-result" data-cents={tb.resultCents}>
+            {formatMoney(tb.resultCents)}
+          </p>
         </Section>
       </div>
     </div>

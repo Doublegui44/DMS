@@ -10,6 +10,7 @@ import { Fields, PageHeader, Section } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { ActionButton } from "@/components/shared/action-button";
 import { Button } from "@/components/ui/button";
+import { PdfButton } from "@/components/shared/pdf-button";
 import { deleteDraftInvoiceAction, issueInvoiceAction } from "../../actions";
 import { CreditForm } from "./credit-form";
 
@@ -43,6 +44,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         }
         actions={
           <>
+            {!isDraft && <PdfButton kind="invoice" id={inv.id} />}
             {isDraft && canValidate && <ActionButton action={issueInvoiceAction.bind(null, inv.id)} label={t("issue")} successMessage="Invoice issued" />}
             {isDraft && canCreate && (
               <ActionButton action={deleteDraftInvoiceAction.bind(null, inv.id)} label={t("deleteDraft")} variant="outline" confirm="Delete this draft?" />

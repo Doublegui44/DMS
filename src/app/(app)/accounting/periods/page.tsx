@@ -3,7 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
 import { getRequestContext, query } from "@/lib/session";
 import { can } from "@/lib/rbac";
-import { formatDate } from "@/lib/dates";
+import { formatDate, isoDate } from "@/lib/dates";
 import { getPeriodChecklist, listPeriods, periodLabel } from "@/modules/accounting";
 import { PageHeader, Section } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -13,6 +13,19 @@ import { lockPeriodAction } from "../actions";
 import { ReopenForm } from "./reopen-form";
 
 export const metadata = { title: "Fiscal periods" };
+
+/** The reports an accountant reviews before locking a month. */
+function closePack(p: { year: number; month: number; startDate: Date; endDate: Date }) {
+  const from = isoDate(p.startDate);
+  const to = isoDate(p.endDate);
+  const period = `${p.year}-${String(p.month).padStart(2, "0")}`;
+  return [
+    { key: "trialBalance", label: "trialBalance", href: `/accounting/trial-balance?from=${from}&to=${to}` },
+    { key: "pnl", label: "profitAndLoss", href: `/accounting/reports/pnl?from=${from}&to=${to}` },
+    { key: "vat", label: "vatReturn", href: `/accounting/reports/vat?period=${period}` },
+    { key: "receivables", label: "receivablesAgeing", href: "/accounting/reports/ageing?type=receivables" },
+  ] as const;
+}
 
 export default async function PeriodsPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
   const sp = await searchParams;
@@ -78,10 +91,18 @@ export default async function PeriodsPage({ searchParams }: { searchParams: Prom
                   </li>
                 ))}
               </ul>
-              <div className="flex gap-2">
-                <Link href={`/accounting/trial-balance?from=${selected.startDate.toISOString().slice(0, 10)}&to=${selected.endDate.toISOString().slice(0, 10)}`} className="text-sm text-primary hover:underline">
-                  {t("trialBalance")} →
-                </Link>
+              <div data-testid="close-pack">
+                <div className="text-xs font-medium text-muted-foreground">{t("closePack")}</div>
+                <p className="mb-1.5 text-xs text-muted-foreground">{t("closePackHint")}</p>
+                <ul className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+                  {closePack(selected).map((l) => (
+                    <li key={l.key}>
+                      <Link href={l.href} className="text-primary hover:underline" data-testid={`close-pack-${l.key}`}>
+                        {t(l.label)} →
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
               </div>
               {selected.status === "OPEN" && can(actor.permissions, "accounting.period", "validate") && (
                 <ActionButton

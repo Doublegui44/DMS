@@ -82,7 +82,11 @@ export default async function WarrantyPage({ searchParams }: { searchParams: Pro
               )}
               {d.rows.map((c) => (
                 <tr key={c.id} className="border-b last:border-0" data-claim={c.number}>
-                  <td className="py-1.5 pr-3 font-mono text-xs">{c.number}</td>
+                  <td className="py-1.5 pr-3 font-mono text-xs">
+                    <Link href={`/api/pdf/warranty-claim/${c.id}`} target="_blank" prefetch={false} className="text-primary hover:underline" title="PDF">
+                      {c.number}
+                    </Link>
+                  </td>
                   <td className="py-1.5 pr-3 tabular-nums">{formatDate(c.submittedOn)}</td>
                   <td className="py-1.5 pr-3">{c.brand.name}</td>
                   <td className="py-1.5 pr-3">

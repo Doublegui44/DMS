@@ -62,20 +62,4 @@ test.describe("accounting", () => {
     await page.getByRole("button", { name: "Reverse" }).click();
     await expect(page.getByText(/^Reversal of OD-/).first()).toBeVisible({ timeout: 15_000 });
   });
-
-  test("the accountant locks the last finished month; a salesperson cannot see the periods screen", async ({ page }) => {
-    await login(page, "accountant@dms.test");
-    await page.goto("/accounting/periods");
-    const checklist = page.getByTestId("close-checklist");
-    await expect(checklist).toContainText("All earlier periods are locked");
-    page.once("dialog", (d) => d.accept());
-    await page.getByRole("button", { name: "Lock period" }).click();
-    await expect(page.getByText("Period locked")).toBeVisible({ timeout: 15_000 });
-    await expect(checklist).toContainText("Period is already locked");
-
-    await page.context().clearCookies();
-    await login(page, "salesperson1.nantes@dms.test");
-    await page.goto("/accounting/periods");
-    await expect(page).toHaveURL(/\/forbidden$/);
-  });
 });

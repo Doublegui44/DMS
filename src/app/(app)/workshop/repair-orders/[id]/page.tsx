@@ -10,6 +10,7 @@ import { Fields, PageHeader, Section } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { SpecForm } from "@/components/shared/spec-form";
 import { ActionButton } from "@/components/shared/action-button";
+import { PdfButton } from "@/components/shared/pdf-button";
 import { EntryLink } from "../../../parts/entry-link";
 import {
   addJobAction,
@@ -60,6 +61,7 @@ export default async function RepairOrderPage({ params }: { params: Promise<{ id
         }
         actions={
           <>
+            <PdfButton kind="repair-order" id={ro.id} />
             {d.canEdit && ro.status === "INVOICED" && (
               <ActionButton action={closeRepairOrderAction.bind(null, ro.id)} label={t("handOver")} icon={<CircleCheck />} successMessage={t("handedOver")} />
             )}

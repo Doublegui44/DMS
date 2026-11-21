@@ -5,13 +5,38 @@ import { centsToCsv, toCsv } from "@/lib/csv";
 import { DomainError } from "@/lib/errors";
 import { listCustomers, listVehicles } from "@/modules/core";
 import { listAuditLog, listUsers } from "@/modules/admin";
-import { listAccounts, listEntries, listInvoices, listPayments } from "@/modules/accounting";
+import { AGEING_BUCKETS, getPayablesAgeing, getReceivablesAgeing, listAccounts, listEntries, listInvoices, listPayments } from "@/modules/accounting";
 import { listLeads, listOrders, listPoliceRegister, listVnStock, listVoStock } from "@/modules/sales";
 import { listCounterSales, listMovements, listObsoleteStock, listParts, listPurchaseOrders, listStockItems, listSupplierInvoices } from "@/modules/parts";
 import { listLabourOperations, listRepairOrders, listWarrantyClaims } from "@/modules/workshop";
 import { isoDate } from "@/lib/dates";
 
 type Exporter = (sp: Record<string, string>) => Promise<{ rows: Record<string, unknown>[]; columns: { key: string; header: string }[] }>;
+
+function ageingCsv(data: Awaited<ReturnType<typeof getReceivablesAgeing>>) {
+  return {
+    rows: data.rows.map((r) => ({
+      accountCode: r.accountCode,
+      name: r.name,
+      ...Object.fromEntries(AGEING_BUCKETS.map((b) => [b, centsToCsv(r[b])])),
+      total: centsToCsv(r.totalCents),
+      unapplied: centsToCsv(r.unappliedCents),
+      balance: centsToCsv(r.balanceCents),
+    })),
+    columns: [
+      { key: "accountCode", header: "Account" },
+      { key: "name", header: "Name" },
+      { key: "current", header: "Not due" },
+      { key: "d1_30", header: "1-30 days" },
+      { key: "d31_60", header: "31-60 days" },
+      { key: "d61_90", header: "61-90 days" },
+      { key: "d90plus", header: "Over 90 days" },
+      { key: "total", header: "Open documents" },
+      { key: "unapplied", header: "Unapplied" },
+      { key: "balance", header: "Balance" },
+    ],
+  };
+}
 
 /** CSV export for every list view; reuses the list query without pagination. */
 const EXPORTERS: Record<string, Exporter> = {
@@ -613,6 +638,12 @@ const EXPORTERS: Record<string, Exporter> = {
         { key: "invoicedOn", header: "Invoiced" },
       ],
     };
+  },
+  async "receivables-ageing"(sp) {
+    return ageingCsv(await query((ctx) => getReceivablesAgeing(ctx, parseListParams(sp), { all: true })));
+  },
+  async "payables-ageing"(sp) {
+    return ageingCsv(await query((ctx) => getPayablesAgeing(ctx, parseListParams(sp), { all: true })));
   },
   async "warranty-claims"(sp) {
     const { rows } = await query((ctx) => listWarrantyClaims(ctx, parseListParams(sp, { sort: "submittedOn", dir: "desc" }), { all: true }));

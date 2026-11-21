@@ -235,3 +235,44 @@ An internal RO prepares a used car in stock (INTAKE, RECONDITIONING, FOR_SALE or
 - **Accounting seed:** the fake workshop invoices from Phase 2 are gone; all workshop revenue now comes from real ROs.
 - **Open work for the demo:** ROs at every open stage on the last day, and appointments for the next 14 days.
 - **Cost:** the seed now takes about 200 s.
+
+## D-062 — A reports module reads across modules
+- `src/modules/reports` holds the read models that need several modules: role dashboards, the stock value report and printable documents. It imports the other modules only through their `index.ts` and never writes.
+- Reports that need only the journal stay in accounting (`queries/reports.ts`, pure rules in `domain/reports.ts`), so accounting still imports no operational module.
+
+## D-063 — P&L by department from the journal
+- Every P&L line already carries a `departmentCode` (posting requires it on 6/7 accounts), so the P&L is a `groupBy` on journal lines, never a recomputation from invoices.
+- Sections by account prefix: 70 revenue, 60 cost of sales, other 6 expenses, other 7 other income. Gross margin = revenue − cost of sales; result = gross margin − expenses + other income. Lines without a department show as "Unallocated".
+- Labour cost sits in 641 (salaries, OVERHEAD), not in workshop cost of sales, so the workshop gross margin is close to 100 %. The P&L page says so.
+
+## D-064 — Ageing balance
+- **Receivables:** open invoices and credit notes (ISSUED / PARTIALLY_PAID) aged by due date in five buckets (not due, 1–30, 31–60, 61–90, over 90). Each customer row also shows the GL balance of its 411 lines and the difference as "unapplied" (deposits and payments not yet allocated), so the report always ties to the ledger.
+- **Payables:** suppliers have no open-item table, so open items are rebuilt FIFO from their 40x lines (408 excluded): payments settle the oldest documents first, and the balance sits on the newest. Due date = entry date + the supplier's payment terms.
+- Payables look old in the seed because vehicle purchases from OEMs and traders are never paid (D-039).
+
+## D-065 — VAT return
+- Collected (4457x) and deductible (4456x) VAT for a month come from the journal; net due = collected − deductible.
+- The same page lists sales by regime and rate from invoice lines and shows the difference between invoiced VAT and collected VAT as "unexplained", which should be zero. Flow 6 checks it.
+
+## D-066 — FEC export
+- `getFecExport(ctx, year)` returns the 18 standard columns, `|`-separated, CRLF, a header row, amounts with a decimal comma, dates as `YYYYMMDD`. File name `<SIREN>FEC<closing date>.txt`.
+- Auxiliary account = the customer's or supplier's own account code and name. Piece reference = the invoice or payment number, else the entry number. Lettering date = the latest entry date of the lettering group.
+- Group-wide users only: the FEC covers the legal entity, not one site.
+
+## D-067 — Role dashboards
+- Widgets per role are data (`ROLE_DASHBOARDS` in `reports/domain/dashboards.ts`). A user with several roles gets the union. A widget is shown only if the user can view its resource, and a "mine" widget (units sold for a salesperson, productivity for a technician) is restricted only if every role that grants it is restricted.
+- Figures reuse the report queries (P&L, ageing, VAT, productivity), so the dashboard and the reports cannot disagree. An integration test and e2e Flow 6 check this.
+- Parts turnover = cost of parts used over the last 90 days (counter sales and RO issues net of returns, at PMP), annualised, ÷ stock value today; days of cover = 365 ÷ turns.
+
+## D-068 — Charts
+- Recharts 3.10.1, client components in `src/components/charts`. Bars only (months on x, one y-axis), legend in series order, tooltip on hover, no animation.
+- Four categorical slots in `--chart-1..4` with light and dark values, checked with a colour-blindness validator. Each department keeps its colour wherever it appears (VN 1, VO 2, workshop 3, parts 4). Two slots are below 3:1 contrast in light mode, so every chart has a table with the same figures next to it.
+
+## D-069 — Printable documents (PDF)
+- `@react-pdf/renderer` 4.9.0, server-side only (`serverExternalPackages`), built-in Helvetica (WinAnsi covers French accents and €).
+- The reports module turns an invoice, credit note, order form, repair order or warranty claim into one neutral `PrintDoc` (`getPrintableDocument`). One A4 template (`components/pdf/print-document.tsx`) lays it out. Money rules live in the pure `invoiceBody` (unit-tested): a line under the margin scheme is printed incl. VAT, left out of the VAT summary, and the margin mention is added.
+- `GET /api/pdf/<kind>/<id>` uses the same permission as the document's screen. Legal mentions come from the `documents.legalMentions` setting (per document type, site-overridable). Identifiers (SIREN, SIRET, VAT number) come from the group and the site.
+
+## D-070 — Month-end close pack
+- The periods screen links the reports to review before locking (trial balance, P&L, VAT return, receivables ageing) for the selected month.
+- e2e Flow 6 (`tests/e2e/close.spec.ts`) owns the lock of the last finished month. It checks that the P&L and trial balance results agree, that the VAT has no unexplained amount, then locks the month and checks that a manual entry dated in it is refused. The lock test moved there from `accounting.spec.ts`.

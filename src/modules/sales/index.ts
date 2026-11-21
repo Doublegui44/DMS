@@ -39,3 +39,4 @@ export {
   STOCK_SORTS,
   POLICE_SORTS,
 } from "./queries/stock";
+export { getUnitsSold, getStockAgeing } from "./queries/performance";

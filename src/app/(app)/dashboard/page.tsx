@@ -5,6 +5,8 @@ import { getCoreDashboard } from "@/modules/core";
 import { getSalesDashboard } from "@/modules/sales";
 import { getPartsDashboard } from "@/modules/parts";
 import { getWorkshopDashboard } from "@/modules/workshop";
+import { getRoleDashboard } from "@/modules/reports";
+import { RoleWidgets } from "./role-widgets";
 import { ROLE_LABELS, type RoleKey } from "@/modules/admin";
 import { PageHeader, Section } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -32,6 +34,7 @@ export default async function DashboardPage() {
   const sales = actor.permissions.has("sales.order:view") ? await query((ctx) => getSalesDashboard(ctx)) : null;
   const parts = actor.permissions.has("parts.stock:view") ? await query((ctx) => getPartsDashboard(ctx)) : null;
   const workshop = actor.permissions.has("workshop.repair_order:view") ? await query((ctx) => getWorkshopDashboard(ctx)) : null;
+  const role = await query((ctx) => getRoleDashboard(ctx));
 
   return (
     <div className="space-y-4">
@@ -53,6 +56,7 @@ export default async function DashboardPage() {
           </>
         )}
       </div>
+      <RoleWidgets d={role} />
       {sales && (
         <Section title={t("salesTitle")}>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="sales-kpis">

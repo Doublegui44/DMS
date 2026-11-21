@@ -7,6 +7,7 @@ const env = loadEnv({ path: ".env.test" }).parsed ?? {};
 
 export default defineConfig({
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
+  esbuild: { jsx: "automatic" }, // as Next.js compiles it (PDF templates are .tsx)
   test: {
     env,
     include: ["tests/unit/**/*.test.ts", "tests/integration/**/*.test.ts"],

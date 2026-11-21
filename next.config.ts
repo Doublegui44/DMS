@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   // e2e runs a second dev server alongside the normal one.
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
   typedRoutes: false,
-  serverExternalPackages: ["@prisma/client", "bcryptjs"],
+  serverExternalPackages: ["@prisma/client", "bcryptjs", "@react-pdf/renderer"],
 };
 
 export default withNextIntl(nextConfig);

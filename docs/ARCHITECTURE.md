@@ -1084,7 +1084,9 @@ Exact accounts are seed data in `AccountMapping`; the table above is the default
 Monthly `FiscalPeriod`s. Checklist (`closeChecklist`): period open, earlier periods with entries locked, business date past month end, period trial balance balanced (blocking); draft invoices (warning). Lock → locked periods reject postings at service and database level. Only `Admin` (`accounting.period:delete`) can reopen, latest locked period first, with an audited reason.
 
 ### 7.5 Reports and exports
-Trial balance, general ledger, customer/supplier ledgers with ageing (0–30/31–60/61–90/>90), P&L by department, gross margin by department, stock value (VN/VO/Parts, reconciled to 37x), VAT report, FEC export (the 18 standard columns, `|` separated).
+Trial balance, general ledger, customer/supplier ledgers with ageing (not due, 1–30, 31–60, 61–90, over 90; D-064), P&L by department (D-063), gross margin by department, stock value (VN/VO/Parts, reconciled to 37x), VAT return (D-065), FEC export (the 18 standard columns, `|` separated; D-066).
+
+Journal-only reports live in accounting (`queries/reports.ts`). Reports that combine modules (role dashboards D-067, stock value, printable documents D-069) live in the read-only `reports` module, which imports the others through their `index.ts`. PDFs: `GET /api/pdf/<kind>/<id>` → `getPrintableDocument` → one react-pdf template. Before locking a month, the periods screen links its close pack (D-070).
 
 ## 8. Key domain rules (enforced in services)
 

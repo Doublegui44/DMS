@@ -169,3 +169,27 @@ export async function getServiceHistory(ctx: ServiceContext, vehicleId: string) 
   });
   return { ros, appointments };
 }
+
+/** A warranty claim with its job, the car and the invoice raised on the OEM. */
+export async function getWarrantyClaim(ctx: ServiceContext, id: string) {
+  const claim = await ctx.tx.warrantyClaim.findUnique({
+    where: { id },
+    include: {
+      site: true,
+      brand: true,
+      invoice: { include: { lines: { orderBy: { lineNo: "asc" } }, customer: true } },
+      ro: { include: { vehicle: true, customer: { select: { displayName: true } } } },
+      job: {
+        include: {
+          labourLines: { include: { operation: { select: { code: true } } } },
+          partLines: { include: { part: { select: { partNumber: true, description: true } } } },
+          subletLines: true,
+          technician: { select: { firstName: true, lastName: true } },
+        },
+      },
+    },
+  });
+  if (!claim) throw new NotFoundError("WarrantyClaim", id);
+  ctx.require("workshop.warranty", "view", claim.siteId);
+  return claim;
+}

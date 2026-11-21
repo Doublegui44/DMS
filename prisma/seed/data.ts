@@ -222,6 +222,22 @@ export const SETTINGS: Record<string, unknown> = {
   "accounting.collectiveCustomerAccount": "411",
   "accounting.marginSchemeMention": "Régime particulier – Biens d'occasion (art. 297 A du CGI)",
   "parts.allowNegativeStock": false,
+  // Printed at the foot of each document (illustrative wording, edit per legal entity).
+  "documents.legalMentions": {
+    invoice: [
+      "Paiement à réception sauf conditions particulières. Pas d'escompte pour paiement anticipé.",
+      "Pénalités de retard : trois fois le taux d'intérêt légal. Indemnité forfaitaire pour frais de recouvrement : 40 €.",
+    ],
+    orderForm: [
+      "Commande ferme dès signature, sous réserve de l'accord de financement le cas échéant. Acompte non remboursable sauf annulation par le vendeur.",
+      "Les délais de livraison sont donnés à titre indicatif.",
+    ],
+    repairOrder: [
+      "Le client autorise les travaux ci-dessus. Tout travail supplémentaire sera soumis à son accord préalable.",
+      "Les pièces remplacées sont tenues à la disposition du client.",
+    ],
+    warrantyClaim: [],
+  },
   "locale.default": "fr-FR",
 };
 

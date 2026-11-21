@@ -68,7 +68,7 @@ export const NAV: NavGroup[] = [
       { key: "trialBalance", href: "/accounting/trial-balance", resource: "accounting.report", icon: "Scale" },
       { key: "chart", href: "/accounting/chart", resource: "accounting.chart", icon: "ListTree" },
       { key: "periods", href: "/accounting/periods", resource: "accounting.period", icon: "Lock" },
-      { key: "reports", href: "/accounting/reports", resource: "accounting.report", icon: "BarChart3", phase: 6 },
+      { key: "reports", href: "/accounting/reports", resource: "accounting.report", icon: "BarChart3" },
     ],
   },
   {

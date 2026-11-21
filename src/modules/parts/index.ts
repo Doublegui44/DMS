@@ -57,4 +57,4 @@ export {
   SUPPLIER_INVOICE_SORTS,
 } from "./queries/purchasing";
 export { listCounterSales, getCounterSale, getCounterFormData, COUNTER_SORTS } from "./queries/counter";
-export { listCycleCounts, getCycleCount, getCycleCountFormData, getPartsDashboard, COUNT_SORTS } from "./queries/inventory";
+export { listCycleCounts, getCycleCount, getCycleCountFormData, getPartsDashboard, getPartsConsumption, partsStockLedger, COUNT_SORTS } from "./queries/inventory";

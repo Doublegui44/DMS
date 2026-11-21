@@ -13,6 +13,7 @@ import { ActionButton } from "@/components/shared/action-button";
 import { SpecForm } from "@/components/shared/spec-form";
 import { Timeline } from "@/components/shared/timeline";
 import { Button } from "@/components/ui/button";
+import { PdfButton } from "@/components/shared/pdf-button";
 import { cn } from "@/lib/utils";
 import { cancelOrderAction, deliverOrderAction, invoiceOrderAction, orderPaymentAction } from "../../actions";
 import { centsToInput } from "../../quotes/draft";
@@ -74,6 +75,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         }
         actions={
           <>
+            <PdfButton kind="order" id={o.id} />
             <Button asChild size="sm" variant="outline">
               <Link href={`/sales/quotes/${o.quoteId}`}>
                 <FileText /> {t("quote")}
@@ -81,7 +83,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             </Button>
             {o.invoice && (
               <Button asChild size="sm" variant="outline">
-                <Link href={`/accounting/invoices/${o.invoice.id}`}>
+                <Link href={`/accounting/invoices/${o.invoice.id}`} data-testid="order-invoice">
                   <Receipt /> {o.invoice.number}
                 </Link>
               </Button>
