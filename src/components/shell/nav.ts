@@ -78,7 +78,7 @@ export const NAV: NavGroup[] = [
       { key: "roles", href: "/admin/roles", resource: "admin.role", icon: "KeyRound" },
       { key: "settings", href: "/admin/settings", resource: "admin.settings", icon: "Settings" },
       { key: "audit", href: "/admin/audit", resource: "admin.audit", icon: "History" },
-      { key: "simulation", href: "/admin/simulation", resource: "admin.simulation", icon: "FlaskConical", phase: 7 },
+      { key: "simulation", href: "/admin/simulation", resource: "admin.simulation", icon: "FlaskConical" },
     ],
   },
 ];

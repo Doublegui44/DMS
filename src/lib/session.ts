@@ -59,3 +59,17 @@ export async function command<T>(
     return toActionError(err);
   }
 }
+
+/**
+ * Run, as the current user, a service that opens its own transactions (the simulation runner,
+ * one transaction per business step) and convert errors into an ActionResult.
+ */
+export async function longCommand<T>(fn: (actor: Actor) => Promise<T>): Promise<ActionResult<T>> {
+  try {
+    const { actor } = await getRequestContext();
+    return { ok: true, data: await fn(actor) };
+  } catch (err) {
+    if (err && typeof err === "object" && "digest" in err) throw err;
+    return toActionError(err);
+  }
+}

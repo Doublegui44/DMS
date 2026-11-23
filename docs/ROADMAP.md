@@ -94,13 +94,13 @@ Each phase ends with: migrations applied, seed updated, tests green, app running
 - **Done when:** Flow 6 passes and each role's dashboard shows correct seeded figures → `tests/e2e/close.spec.ts` (close pack reviewed, P&L = trial balance result, VAT fully explained, month locked, manual entry in it refused; accountant, dealer principal and technician dashboards checked against the reports; PDFs served)
 - Deferred: balance sheet, editing legal mentions in the UI, French/Spanish PDF wording, e-invoicing formats (Factur-X), emailing documents.
 
-## Phase 7 — Simulation engine
-- [ ] Scenario runner (service-layer only) with configurable rates; CLI + admin page
-- [ ] Simulated clock with end-of-day jobs (reservation expiry, ageing, overdue, reorder suggestions)
-- [ ] Role switcher (demo mode)
-- [ ] One-command reset; seed history generated via the runner (6 months)
-- [ ] Invariant test: trial balance and stock/sub-ledger reconciliation after 30 days
-- **Done when:** 30 simulated days run with no errors and the trial balance still balances
+## Phase 7 — Simulation engine ✅
+- [x] Scenario runner (service-layer only) with configurable rates; CLI + admin page (D-071, D-075)
+- [x] Simulated clock with end-of-day jobs: reservation and quote expiry; ageing and overdue derived from the date; reorder suggestions placed on Mondays (D-073)
+- [x] Role switcher (demo mode, since Phase 1); the runner acts as each site's users (D-072)
+- [x] One-command reset (`npm run db:reset`). Seed history stays with the seed's own generators, not the runner (D-074)
+- [x] Invariant test: trial balance and stock/sub-ledger reconciliation after 30 days
+- **Done when:** 30 simulated days run with no errors and the trial balance still balances ✔ (seeded database: 30 days in ~65 s, ~2,000 steps)
 
 ## Later (not scheduled)
 - French and Spanish translations

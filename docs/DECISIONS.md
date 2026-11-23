@@ -276,3 +276,31 @@ An internal RO prepares a used car in stock (INTAKE, RECONDITIONING, FOR_SALE or
 ## D-070 — Month-end close pack
 - The periods screen links the reports to review before locking (trial balance, P&L, VAT return, receivables ageing) for the selected month.
 - e2e Flow 6 (`tests/e2e/close.spec.ts`) owns the lock of the last finished month. It checks that the P&L and trial balance results agree, that the VAT has no unexplained amount, then locks the month and checks that a manual entry dated in it is refused. The lock test moved there from `accounting.spec.ts`.
+
+## D-071 — Scenario runner: stateless, one transaction per business step
+- `modules/simulation` runs day by day from the business date: on each open day (Monday–Saturday) every site's accounts, sales, workshop and parts desks act, then `advanceBusinessDay` moves the clock. Sundays only advance the clock.
+- Every action is a call to another module's public service (`createLead`, `acceptQuote`, `checkIn`, `invoiceCounterSale`, `recordPayment`…), never a direct write, so each one has its usual downstream effects (stock, invoices, entries, events, audit).
+- Each step runs in its own `runCommand` on the simulated day. A `DomainError` (a business rule refusing the step) is recorded in the report and the run goes on; any other error stops the run and is reported with its day. The days before it are kept.
+- The runner keeps no state between days: it reads what is open in the database (leads, quotes, orders, ROs, deliveries, invoices due). Decisions about one record (accept this quote? cancel this order? pay this invoice late? how many days in the workshop?) use `unit(seed, recordId, purpose)`, a draw fixed for that record, so the answer does not depend on which day the runner looks or whether the run was split. Counts per day (new leads, visits, counter sales) use a seeded stream (Poisson for rates). The same seed on the same data gives the same run.
+- Rates are a Zod schema with defaults (`domain/config.ts`), per site and per open day unless named per week. They are what the admin form and the CLI flags expose.
+
+## D-072 — The runner acts as the sites' own users
+- For each site it loads the active holders of each role (first by email): salespeople, sales manager, service advisor, service manager, parts manager, plus the group's dealer principal and accountant (`loadCast`). Each step runs as the person who would do it: the salesperson quotes, the sales manager or dealer principal approves discounts (by the D-036 thresholds), the advisor checks cars in, the service manager runs the workshop, the accountant pays and collects. Permissions are checked as for the screens.
+- A role with nobody in it skips its steps. Starting a run needs `admin.simulation:edit` (admin); the CLI starts as the system actor.
+
+## D-073 — End-of-day jobs and derived states
+- `BusinessDayAdvanced` already expires reservations and quotes (sales handler). Stock ageing and overdue receivables need no job: they are computed from the business date when read (ageing report, VO ageing, dashboards), so moving the clock is enough.
+- Parts reorder suggestions are placed by the runner on Mondays as the parts manager (`createSuggestedOrders` + `sendPurchaseOrder`), as a person would, rather than ordering automatically at the end of each day.
+- The runner creates the accounting periods a month ahead (`ensurePeriods`) so a run can cross a year end.
+- Overheads: rent on the 1st and salaries on the 28th repeat the last amounts booked, so the runner needs no figures of its own.
+
+## D-074 — Seed history stays with the seed (roadmap deviation)
+- The roadmap planned to generate the six months of seed history with the runner. The seed keeps its own per-module generators instead: they already go through the services, and they shape a demo state the runner does not aim for (months locked except the last finished one, repair orders left at every stage, cycle counts, transfers, rejected supplier invoices, a few invoices left overdue). Rewriting them would change every seeded figure and the e2e flows built on them.
+- The runner continues from any seeded state, so `npm run db:reset` then `npm run simulate -- --days 30` gives a database a month further on. Workshop job templates are copied from the seed into `simulation/domain/templates.ts`; keep the two in step.
+
+## D-075 — Run reports as events; the simulation screen
+- A run ends with an audit row and a `SimulationRun` domain event carrying its report: period, counts per step, refused steps (first 50), invariants (journal debit = credit, stock accounts = sub-ledgers, D-005/D-049) and any error. No new table: `/admin/simulation` lists the latest events.
+- The screen runs 1–30 days for all sites or one, with every rate editable. The server action uses `longCommand` (session) because the runner opens its own transactions; a 30-day run on the seeded database takes about a minute.
+- CLI: `npm run simulate -- --days 30 --site nantes --leads-per-day 1.5` (one flag per rate, kebab-case), on the database of `.env`; exit code 1 if the run stopped or the books do not hold.
+- Tests: `tests/integration/simulation.test.ts` runs 30 days on a small org and checks the invariants, that every desk acted and that no step was refused. e2e Flow 7 (`tests/e2e/zz-simulation.spec.ts`) runs one day from the screen; the file name makes it run last because it moves the e2e clock.
+
