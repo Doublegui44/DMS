@@ -1,0 +1,88 @@
+# CI (Phase 8, D-077): typecheck, lint and Vitest on every push and pull request, then the
+# Playwright suite on a production build. Postgres 17 runs as a service; the test env files,
+# which are not committed, are written with TCP URLs.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PGPASSWORD: postgres
+
+jobs:
+  checks:
+    name: Typecheck, lint, Vitest
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Test database and env
+        run: |
+          psql -h localhost -U postgres -c "CREATE DATABASE dms_test"
+          cat > .env.test <<'ENV'
+          DATABASE_URL="postgresql://postgres:postgres@localhost:5432/dms_test"
+          AUTH_SECRET="ci-only-secret-0123456789abcdef"
+          AUTH_TRUST_HOST=true
+          DEMO_MODE=true
+          ENV
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
+  e2e:
+    name: Playwright (production build)
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx playwright install --with-deps chromium
+      - name: e2e database and env
+        run: |
+          psql -h localhost -U postgres -c "CREATE DATABASE dms_e2e"
+          cat > .env.e2e <<'ENV'
+          DATABASE_URL="postgresql://postgres:postgres@localhost:5432/dms_e2e"
+          AUTH_SECRET="ci-only-secret-0123456789abcdef"
+          AUTH_TRUST_HOST=true
+          DEMO_MODE=true
+          ENV
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7

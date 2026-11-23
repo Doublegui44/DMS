@@ -102,7 +102,27 @@ Each phase ends with: migrations applied, seed updated, tests green, app running
 - [x] Invariant test: trial balance and stock/sub-ledger reconciliation after 30 days
 - **Done when:** 30 simulated days run with no errors and the trial balance still balances ✔ (seeded database: 30 days in ~65 s, ~2,000 steps)
 
+## Phase 8 — Reliable e2e and CI ✅
+- [x] e2e against a production build (`next build` + `next start`) instead of the dev server: faster, no compile stalls (D-076)
+- [x] CI workflow (GitHub Actions + Postgres): typecheck, lint, Vitest, Playwright (D-077)
+- **Done when:** the full e2e suite passes twice in a row on a production build, and CI runs on every push ✔ locally: 31/31 twice, 4.7 and 4.6 min (was 15.7 min on the dev server). The workflow runs once the commit is pushed.
+
+## Phase 9 — Simulator completeness
+- [ ] Supplier payment run for vehicle purchases (OEMs and traders), so payables age realistically (D-064)
+- [ ] Activities the seed has and the runner lacks: stock transfers between sites, monthly cycle counts, insurance jobs with sublets, supplier invoice variances and rejections, VO bought from private sellers
+- [ ] Long runs in the background from the admin screen, with progress
+- **Done when:** a 30-day run exercises every desk and every flow above, and the invariants still hold
+
+## Phase 10 — Translations and integrations
+- [ ] French translation (then Spanish)
+- [ ] Interactive VO market price feed, OEM order portal mock
+- [ ] Multi-currency (only if demos need it)
+- **Done when:** the app runs fully in French with a language switcher
+
+## Phase 11 — Demo readiness
+- [ ] README with a demo script (reset, roles, a week of simulation, dashboards, month-end close)
+- [ ] Hosted demo option (Docker image with seeded data)
+- **Done when:** someone new can run the demo from the README alone
+
 ## Later (not scheduled)
-- French and Spanish translations
-- Interactive VO market price feed, OEM order portal mock
-- Multi-currency
+- Nothing yet: the former items moved to Phase 10.

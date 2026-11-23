@@ -304,3 +304,12 @@ An internal RO prepares a used car in stock (INTAKE, RECONDITIONING, FOR_SALE or
 - CLI: `npm run simulate -- --days 30 --site nantes --leads-per-day 1.5` (one flag per rate, kebab-case), on the database of `.env`; exit code 1 if the run stopped or the books do not hold.
 - Tests: `tests/integration/simulation.test.ts` runs 30 days on a small org and checks the invariants, that every desk acted and that no step was refused. e2e Flow 7 (`tests/e2e/zz-simulation.spec.ts`) runs one day from the screen; the file name makes it run last because it moves the e2e clock.
 
+## D-076 — e2e against a production build
+- Playwright used to start `next dev`, which compiles each page on its first visit. The suite took about 16 minutes and a page sometimes stalled long enough to time out (Phase 6 Flow 3, Phase 7 Flows 2 and 4), with nothing wrong in the app.
+- `scripts/e2e-server.sh` now resets and seeds `dms_e2e` while `next build` runs (`.next-e2e-build`), then serves it with `next start` on :3100. The build also type-checks the app as the tests see it.
+- `E2E_DEV=1 npx playwright test …` keeps the dev server (no build, hot reload) for debugging a spec.
+
+## D-077 — CI on GitHub Actions
+- `.github/workflows/ci.yml`: on every push and pull request, job `checks` runs typecheck, lint and Vitest against a Postgres 17 service; job `e2e` then runs Playwright on the production build and uploads the traces when it fails.
+- The env files for tests are not committed (they hold local socket URLs), so CI writes `.env.test` and `.env.e2e` with TCP URLs and CI-only secrets. `assertSafeDatabase` accepts them (local host, `dms_*` name).
+

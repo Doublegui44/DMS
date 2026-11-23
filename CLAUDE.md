@@ -12,7 +12,7 @@ Web simulator of a French multi-site car dealer group's Dealer Management System
 
 ## Current phase
 
-**Phase 7 done** (Simulation engine). All roadmap phases are built; see `docs/ROADMAP.md` "Later" for what is unscheduled.
+**Phase 8 done** (e2e on a production build, CI). **Next: Phase 9 — Simulator completeness** (see `docs/ROADMAP.md`).
 
 Built so far: `src/modules/core` (customers, suppliers, vehicles, numbering, clock, timeline, dashboard), `src/modules/admin` (role matrix, users, audit), `src/modules/accounting` (chart, mappings, posting, periods, invoices/credit notes, payments, lettering, ledgers, trial balance) `src/modules/sales` (catalogue, leads, quotes with approvals, reservations, orders, factory orders, trade-ins, VO purchases and costs, police register) and `src/modules/parts` (catalogue, supersessions, discount matrix, stock per site/bin at PMP, purchasing and receipts, supplier invoice matching, counter sales, transfers, cycle counts, obsolescence) `src/modules/workshop` (labour catalogue and rates, planner and appointments, check-in, repair orders with jobs per payer, parts issue, sublets, additional-work approval, clocking, productivity, invoicing per payer, warranty claims, internal ROs into VO stock, service history) `src/modules/reports` (role dashboards, stock value, printable documents), plus the accounting reports (P&L by department, VAT return, ageing, FEC), and `src/modules/simulation` (scenario runner, CLI and `/admin/simulation`).
 
@@ -29,13 +29,14 @@ Next.js 15 (App Router, Server Actions) · TypeScript strict · Tailwind v4 + sh
 | `npm run db:seed` | Seed an empty database |
 | `npm run db:reset` | Migrate, truncate all tables and reseed (`scripts/db-reset.ts`; refuses anything but a local `dms_*` DB) |
 | `npm test` | Vitest unit + integration (integration wipes `dms_test`) |
-| `npm run test:e2e` | Playwright; resets + seeds `dms_e2e`, runs a dev server on :3100 (`.next-e2e`) |
+| `npm run test:e2e` | Playwright; resets + seeds `dms_e2e` while building the app, then serves the production build on :3100 (`.next-e2e-build`, `scripts/e2e-server.sh`). `E2E_DEV=1` uses the dev server instead |
 | `npm run lint` / `npm run typecheck` | ESLint (incl. module-boundary + no-wall-clock rules) / `tsc --noEmit` |
 | `npm run simulate -- --days 30 --site nantes` | Scenario runner on the DB of `.env` (moves its clock; one flag per rate, e.g. `--leads-per-day 1.5 --seed 3`) |
 
 Single tests:
 - `npx vitest run tests/unit/money.test.ts` · `npx vitest run -t "gap-free"` (integration files need local Postgres; `tests/integration/global-setup.ts` runs `prisma migrate deploy` on `dms_test` first)
-- `npx playwright test -g "TECHNICIAN"`, `npx playwright test tests/e2e/sales.spec.ts` (Flow 1), `tests/e2e/parts.spec.ts` (Flow 5), `tests/e2e/workshop.spec.ts` (Flows 2, 3, 4), `tests/e2e/close.spec.ts` (Flow 6, which locks the last finished month of `dms_e2e`) or `tests/e2e/zz-simulation.spec.ts` (Flow 7, named to run last because it moves the clock). Playwright always restarts its own server on :3100 and reseeds `dms_e2e` first (~4 min with the seed).
+- `npx playwright test -g "TECHNICIAN"`, `npx playwright test tests/e2e/sales.spec.ts` (Flow 1), `tests/e2e/parts.spec.ts` (Flow 5), `tests/e2e/workshop.spec.ts` (Flows 2, 3, 4), `tests/e2e/close.spec.ts` (Flow 6, which locks the last finished month of `dms_e2e`) or `tests/e2e/zz-simulation.spec.ts` (Flow 7, named to run last because it moves the clock). Playwright always restarts its own server on :3100 and reseeds `dms_e2e` first (~4 min with the seed, the build runs alongside). For a quick loop on one spec, `E2E_DEV=1 npx playwright test …` skips the build.
+- CI (`.github/workflows/ci.yml`, D-077) runs typecheck, lint, Vitest, then Playwright, on GitHub Actions with a Postgres 17 service; it writes its own `.env.test` / `.env.e2e`.
 - After editing `prisma/schema.prisma`: `npm run db:migrate -- --name <name>` (regenerates the client).
 
 Databases (local Homebrew Postgres 17, socket `/tmp`): `dms_dev` (.env), `dms_test` (.env.test), `dms_e2e` (.env.e2e).
