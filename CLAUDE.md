@@ -32,6 +32,8 @@ Next.js 15 (App Router, Server Actions) · TypeScript strict · Tailwind v4 + sh
 | `npm run test:e2e` | Playwright; resets + seeds `dms_e2e` while building the app, then serves the production build on :3100 (`.next-e2e-build`, `scripts/e2e-server.sh`). `E2E_DEV=1` uses the dev server instead |
 | `npm run lint` / `npm run typecheck` | ESLint (incl. module-boundary + no-wall-clock rules) / `tsc --noEmit` |
 | `npm run simulate -- --days 30 --site nantes` | Scenario runner on the DB of `.env` (moves its clock; one flag per rate, e.g. `--leads-per-day 1.5 --seed 3`) |
+| `docker build -t dms-demo .` | Self-contained demo image: Postgres 17 + production server, DB seeded at build, port 7860 (D-085) |
+| `scripts/deploy-hf.sh <user>/<space>` | Push the working tree (minus ignored files) to a Hugging Face Docker Space; needs git-lfs and the user's own HF login. `SITE_PASSWORD` turns on the site-wide Basic-auth gate (`src/middleware.ts`) |
 
 Single tests:
 - `npx vitest run tests/unit/money.test.ts` · `npx vitest run -t "gap-free"` (integration files need local Postgres; `tests/integration/global-setup.ts` runs `prisma migrate deploy` on `dms_test` first)

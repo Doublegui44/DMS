@@ -120,7 +120,7 @@ Each phase ends with: migrations applied, seed updated, tests green, app running
 
 ## Phase 11 — Demo readiness
 - [ ] README with a demo script (reset, roles, a week of simulation, dashboards, month-end close)
-- [ ] Hosted demo option (Docker image with seeded data)
+- [x] Hosted demo option (Docker image with seeded data; free on Hugging Face Spaces, D-085)
 - **Done when:** someone new can run the demo from the README alone
 
 ## Later (not scheduled)
