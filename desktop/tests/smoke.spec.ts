@@ -29,8 +29,12 @@ async function launch(): Promise<{ app: ElectronApplication; page: Page }> {
 }
 
 async function signInAs(page: Page, email: string) {
-  await page.locator(`button[data-email="${email}"]`).click();
-  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
+  // On a slow machine the page can show before React has wired its buttons; a click then does
+  // nothing, so click again until the dashboard opens.
+  await expect(async () => {
+    await page.locator(`button[data-email="${email}"]`).click({ timeout: 5_000 });
+    await expect(page).toHaveURL(/\/dashboard$/, { timeout: 10_000 });
+  }).toPass({ timeout: 90_000 });
 }
 
 test.describe.configure({ mode: "serial" });

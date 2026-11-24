@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "marquee",
+        "value": "*",
+        "files": [
+          "desktop/src/splash.html"
+        ],
+        "createdAt": "2026-11-24T22:14:43.498Z",
+        "reason": "Claude: the sliding bar is an indeterminate loading indicator on the startup splash (no content scrolls), and it stops under prefers-reduced-motion"
+      }
+    ]
+  }
+}
