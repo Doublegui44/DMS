@@ -2059,6 +2059,7 @@
     "warranty_claim__paid": "Warranty claim paid",
     "warranty_claim__submit": "Warranty claim submitted",
     "system": "System",
-    "empty": "No activity yet."
+    "empty": "No activity yet.",
+    "auditTag": "audit log"
   }
 }

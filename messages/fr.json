@@ -2059,6 +2059,7 @@
     "warranty_claim__paid": "Demande de garantie payée",
     "warranty_claim__submit": "Demande de garantie envoyée",
     "system": "Système",
-    "empty": "Aucune activité pour l'instant."
+    "empty": "Aucune activité pour l'instant.",
+    "auditTag": "journal d'audit"
   }
 }

@@ -23,7 +23,11 @@ export async function Timeline({ items, empty }: { items: TimelineEntry[]; empty
               i.kind === "event" ? "bg-primary" : "bg-muted-foreground/50"
             }`}
           />
-          <div className="text-[13px] font-medium">{activityLabel(t, i.title)}</div>
+          {/* An action and its audit row often share a label: the tag tells them apart. */}
+          <div className="text-[13px] font-medium">
+            {activityLabel(t, i.title)}
+            {i.kind === "audit" && <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">{t("auditTag")}</span>}
+          </div>
           <div className="text-xs text-muted-foreground">
             {formatDate(i.businessDate)} · {i.userName ?? t("system")}
             <span className="ml-1 opacity-60">({formatDateTime(i.at)})</span>
