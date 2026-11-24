@@ -118,8 +118,8 @@ Each phase ends with: migrations applied, seed updated, tests green, app running
 - [x] Interactive VO market price feed (trade-in in the quote builder, VO purchase) and OEM order portal mock (D-083, D-084)
 - **Done when:** the app runs fully in French with a language switcher
 
-## Phase 11 — Demo readiness
-- [ ] README with a demo script (reset, roles, a week of simulation, dashboards, month-end close)
+## Phase 11 — Demo readiness ✅
+- [x] README with a demo script (reset, roles, a sale with a trade-in, a workshop visit, parts, a week of simulation, dashboards, month-end close)
 - [x] Hosted demo option (Docker image with seeded data; free on Hugging Face Spaces, D-085)
 - **Done when:** someone new can run the demo from the README alone
 
