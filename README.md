@@ -70,43 +70,4 @@ Every invoice, order form, repair order and warranty claim also prints as a PDF 
 
 ### Reset
 
-`npm run db:reset` returns to the seeded state at today's date. On the hosted demo, restarting the Space does the same.
-
-## Share the demo from your Mac (free tunnel)
-
-`scripts/demo-tunnel.sh` serves the app from your Mac and gives it a public HTTPS address through a Cloudflare quick tunnel: free, no account (D-086).
-
-```bash
-brew install cloudflared       # once
-scripts/demo-tunnel.sh         # asks for the site password, builds, opens the tunnel
-```
-
-- The script prints an address like `https://random-words.trycloudflare.com`. Send it with the site password. Visitors type the password (any username), then pick a role on the login page.
-- The app uses its own database, `dms_demo` (created and seeded on the first run), never `dms_dev`. It listens only on 127.0.0.1, so the tunnel is the only way in.
-- `--reset` reseeds `dms_demo` at today's date (about 3 minutes). `--no-build` skips the build when the code has not changed.
-- It works only while your Mac is awake and the script runs. Ctrl-C stops the app and the tunnel. Each start gets a new random address.
-
-## Host a demo on Hugging Face Spaces (paid)
-
-Since July 2026, Hugging Face needs a PRO plan (about $9 a month) to create Docker Spaces; free accounts can only create static ones.
-
-The `Dockerfile` builds one self-contained image: Postgres 17 and the production server, with the demo database seeded while the image is built. Each start begins from that seeded state (D-085).
-
-1. On huggingface.co, create a **Space** with SDK **Docker**, hardware **CPU basic (free)**, visibility **Public**.
-2. In the Space's **Settings → Variables and secrets**, add:
-   - secret `AUTH_SECRET`: the output of `openssl rand -base64 32`
-   - secret `SITE_PASSWORD`: the shared password your visitors will type
-   - variable `DEMO_MODE`: `true`
-3. Install git-lfs once (`brew install git-lfs`; the favicon is a binary file), then deploy:
-
-   ```bash
-   scripts/deploy-hf.sh <hf-user>/<space-name>
-   ```
-
-   Git asks for your Hugging Face username and an access token with write permission the first time. The build takes about 10 minutes.
-4. Share the direct address `https://<hf-user>-<space-name>.hf.space` and the site password. Do not share the huggingface.co page: it shows the app in a frame, where browsers block the login cookie.
-
-Good to know:
-- Everyone shares one database and one business clock. A simulation run moves the date for everybody.
-- The Space sleeps after about 48 hours without visits. Waking it up or restarting it resets the data to the seeded demo. Rebuilding it (a new deploy, or **Factory rebuild**) reseeds with today's date.
-- The same image runs on any Docker host: `docker build -t dms-demo .` then `docker run -p 7860:7860 -e AUTH_SECRET=… -e DEMO_MODE=true -e SITE_PASSWORD=… dms-demo`.
+`npm run db:reset` returns to the seeded state at today's date.

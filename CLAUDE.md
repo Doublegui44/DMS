@@ -12,7 +12,7 @@ Web simulator of a French multi-site car dealer group's Dealer Management System
 
 ## Current phase
 
-**Phase 11 done** (README demo script, hosted demo image on Hugging Face Spaces). All roadmap phases are done; open items are under "Later" in `docs/ROADMAP.md`. The README's demo script names screens and buttons: keep it in step when they change.
+**Phase 11 done** (README demo script). **Next: Phase 12 — Desktop demo app** for Mac and Windows (see `docs/ROADMAP.md`). The README's demo script names screens and buttons: keep it in step when they change.
 
 Built so far: `src/modules/core` (customers, suppliers, vehicles, numbering, clock, timeline, dashboard), `src/modules/admin` (role matrix, users, audit), `src/modules/accounting` (chart, mappings, posting, periods, invoices/credit notes, payments, lettering, ledgers, trial balance) `src/modules/sales` (catalogue, leads, quotes with approvals, reservations, orders, factory orders, trade-ins, VO purchases and costs, police register) and `src/modules/parts` (catalogue, supersessions, discount matrix, stock per site/bin at PMP, purchasing and receipts, supplier invoice matching, counter sales, transfers, cycle counts, obsolescence) `src/modules/workshop` (labour catalogue and rates, planner and appointments, check-in, repair orders with jobs per payer, parts issue, sublets, additional-work approval, clocking, productivity, invoicing per payer, warranty claims, internal ROs into VO stock, service history) `src/modules/reports` (role dashboards, stock value, printable documents), plus the accounting reports (P&L by department, VAT return, ageing, FEC), and `src/modules/simulation` (scenario runner, CLI and `/admin/simulation`).
 
@@ -32,9 +32,6 @@ Next.js 15 (App Router, Server Actions) · TypeScript strict · Tailwind v4 + sh
 | `npm run test:e2e` | Playwright; resets + seeds `dms_e2e` while building the app, then serves the production build on :3100 (`.next-e2e-build`, `scripts/e2e-server.sh`). `E2E_DEV=1` uses the dev server instead |
 | `npm run lint` / `npm run typecheck` | ESLint (incl. module-boundary + no-wall-clock rules) / `tsc --noEmit` |
 | `npm run simulate -- --days 30 --site nantes` | Scenario runner on the DB of `.env` (moves its clock; one flag per rate, e.g. `--leads-per-day 1.5 --seed 3`) |
-| `docker build -t dms-demo .` | Self-contained demo image: Postgres 17 + production server, DB seeded at build, port 7860 (D-085) |
-| `scripts/deploy-hf.sh <user>/<space>` | Push the working tree (minus ignored files) to a Hugging Face Docker Space; needs git-lfs and the user's own HF login. `SITE_PASSWORD` turns on the site-wide Basic-auth gate (`src/middleware.ts`) |
-| `scripts/demo-tunnel.sh [--reset] [--no-build]` | Free demo from this Mac: builds `.next-demo`, serves `dms_demo` on 127.0.0.1:3400 behind the `SITE_PASSWORD` gate and opens a Cloudflare quick tunnel (`*.trycloudflare.com`, D-086) |
 
 Single tests:
 - `npx vitest run tests/unit/money.test.ts` · `npx vitest run -t "gap-free"` (integration files need local Postgres; `tests/integration/global-setup.ts` runs `prisma migrate deploy` on `dms_test` first)

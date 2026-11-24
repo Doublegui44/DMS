@@ -120,8 +120,39 @@ Each phase ends with: migrations applied, seed updated, tests green, app running
 
 ## Phase 11 — Demo readiness ✅
 - [x] README with a demo script (reset, roles, a sale with a trade-in, a workshop visit, parts, a week of simulation, dashboards, month-end close)
-- [x] Hosted demo option (Docker image with seeded data; free on Hugging Face Spaces, D-085)
-- **Done when:** someone new can run the demo from the README alone
+- **Done when:** someone new can run the demo from the README alone ✔
+
+## Phase 12 — Desktop demo app (Mac and Windows)
+Goal: an installer that anyone can run on a Mac or a Windows PC with nothing else to install. Each person gets a private, offline copy of the demo (one-click roles, the README demo script works as written). The web app's code stays the same; the desktop app wraps it.
+
+**How it fits together**
+- `desktop/`: an Electron app (TypeScript) built with electron-builder. Its main process starts Postgres, then the Next.js server, then opens a window on `http://127.0.0.1:<port>`. Nothing listens beyond 127.0.0.1.
+- Server: Next.js `output: "standalone"`, turned on only for desktop builds (an env flag in `next.config.ts`) so dev, CI and e2e do not change. Electron runs `server.js` with its own Node (`utilityProcess.fork`), plus `.next/static` and `public`. Prisma's `binaryTargets` gain the Mac and Windows engines; check that `@react-pdf/renderer` and `bcryptjs` are traced into the standalone output.
+- Database: `embedded-postgres` 17.x (prebuilt binaries for macOS arm64/x64 and Windows x64). Data lives in the app's user-data folder; a free port and a random password are chosen at first launch; Postgres stops when the app quits and recovers from a stale lock after a crash. Single-instance lock, so a second launch focuses the window.
+- Demo data: the build seeds a database once and ships it as `demo.dump` (`pg_dump -Fc`). First launch restores it (seconds); the business date is the build date. Menu **Reset demo** restores it again; **Reseed at today's date** runs the seed in the app (bundled with esbuild, about 3–5 minutes, with progress).
+- App updates: when a new version's schema differs from the user's data, the app says so and resets from the new dump. The data is demo data, so no migration of user changes.
+- Secrets and settings: `DEMO_MODE=true`; `AUTH_SECRET` generated per install and kept in the user-data folder.
+- Window: splash screen while Postgres and the server start (with an error screen and "Open logs" if they fail), external links and PDFs open in the system browser or viewer, menu with Reset, Reseed, Open data folder, About, Quit.
+
+**Steps**
+- [ ] Standalone build: `next.config.ts` flag, Prisma binary targets, a script that assembles server + static + Prisma engines; check it runs with plain Node against a local database.
+- [ ] Postgres lifecycle in `desktop/`: init, start on a free port, stop, crash recovery; pure helpers (paths, port choice, dump/schema compatibility) with unit tests.
+- [ ] Demo dump: script that seeds a fresh embedded database and writes `demo.dump`; first-launch restore; Reset and Reseed menu items.
+- [ ] Electron shell: splash, window, menu, single instance, logs folder, external links and downloads.
+- [ ] Mac build: `.dmg` for Apple Silicon and Intel, built locally (`npm run desktop:build`).
+- [ ] Windows build: `.github/workflows/desktop.yml` on a version tag, matrix macOS arm64, macOS x64 and Windows x64. The dump is made once and shared between jobs; installers go to a draft GitHub Release.
+- [ ] Smoke tests with Playwright's Electron support, in that workflow on both systems: start, one-click sign-in, a dashboard, a PDF, a 1-day simulation, quit and relaunch (data kept), Reset.
+- [ ] README: download, first-launch steps for unsigned apps (macOS: System Settings → Privacy & Security → Open Anyway; Windows: More info → Run anyway), Reset and Reseed.
+- [ ] Decision log entries for the choices above.
+
+**Open questions (decide before starting)**
+- Distribution: the GitHub repository is private, so Release downloads and Electron auto-update need either a public releases-only repository or sending installers by hand. Auto-update comes after that choice.
+- Signing: start unsigned. Later, an Apple Developer ID ($99 a year, signing and notarisation) and a Windows certificate (for example Microsoft Trusted Signing, about $10 a month) remove the security warnings.
+- Windows on ARM and Linux: out of scope unless someone needs them.
+
+**Expect:** installers of roughly 250–400 MB; someone with a Windows PC tries the first installer by hand once.
+
+- **Done when:** on a clean Mac and a clean Windows PC, someone downloads the installer, opens the app, signs in with one click and runs the README demo script without installing anything else.
 
 ## Later (not scheduled)
 - Spanish translation (add `messages/es.json` and `messages/server/es.json`; the i18n unit test checks the keys).
