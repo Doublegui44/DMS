@@ -1,0 +1,88 @@
+{
+  "name": "dms-simulator-desktop",
+  "productName": "DMS Simulator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Desktop demo of the DMS Simulator: the web app with its own database, offline.",
+  "author": "DMS Simulator",
+  "main": "dist/main.mjs",
+  "scripts": {
+    "build:main": "esbuild src/main.ts --bundle --platform=node --format=esm --target=node22 --packages=external --external:electron --outfile=dist/main.mjs && cp src/splash.html dist/splash.html",
+    "build:server": "node scripts/build-server.mjs",
+    "build:dump": "node scripts/make-dump.mjs",
+    "typecheck": "tsc --noEmit",
+    "start": "npm run build:main && electron .",
+    "dist:mac": "npm run build:main && electron-builder --mac --publish never",
+    "dist:win": "npm run build:main && electron-builder --win --publish never",
+    "test:smoke": "playwright test -c playwright.config.ts"
+  },
+  "dependencies": {
+    "embedded-postgres": "17.11.0-beta.19",
+    "pg": "8.23.1",
+    "pg-copy-streams": "7.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.9.1",
+    "@types/pg": "8.15.5",
+    "@types/pg-copy-streams": "1.2.5",
+    "electron": "45.2.3",
+    "electron-builder": "26.18.0",
+    "esbuild": "0.25.10",
+    "typescript": "5.9.3"
+  },
+  "allowScripts": {
+    "electron@45.2.3": true,
+    "esbuild@0.25.10": true,
+    "@embedded-postgres/darwin-arm64@17.11.0-beta.19": true,
+    "electron-winstaller@5.4.0": true,
+    "@embedded-postgres/darwin-x64@17.11.0-beta.19": true,
+    "@embedded-postgres/windows-x64@17.11.0-beta.19": true,
+    "@embedded-postgres/linux-x64@17.11.0-beta.19": true
+  },
+  "build": {
+    "appId": "app.dms-simulator.desktop",
+    "productName": "DMS Simulator",
+    "asar": false,
+    "directories": {
+      "output": "release",
+      "buildResources": "resources"
+    },
+    "files": [
+      "dist/**",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/demo",
+        "to": "demo"
+      }
+    ],
+    "afterPack": "scripts/after-pack.cjs",
+    "artifactName": "DMS-Simulator-${version}-${os}-${arch}.${ext}",
+    "mac": {
+      "target": [
+        {
+          "target": "dmg"
+        }
+      ],
+      "category": "public.app-category.business",
+      "identity": "-",
+      "hardenedRuntime": false
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

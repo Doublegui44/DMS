@@ -15,11 +15,42 @@ npm run dev                   # http://localhost:3000
 
 With `DEMO_MODE=true` the login page offers one-click sign-in for every role. All demo users' password is `demo1234`.
 
+## Desktop app (Mac and Windows)
+
+The desktop app is the same simulator with its own database, so nothing else needs installing and it works offline. Each person gets a private copy of the demo: what they do, and the simulations they run, stay on their computer.
+
+**Download** the installer from the [Releases page](https://github.com/Doublegui44/DMS/releases): `…-mac-arm64.dmg` for Apple Silicon Macs (M1 and later), `…-mac-x64.dmg` for Intel Macs, `…-win-x64.exe` for Windows. Each is about 200–250 MB.
+
+**First launch.** The installers are not signed, so the system asks once whether to trust them:
+- **macOS:** open the `.dmg`, drag **DMS Simulator** to Applications and open it. macOS says it cannot check the app: click **Done**, then open **System Settings → Privacy & Security**, scroll down to the message about DMS Simulator and click **Open Anyway**.
+- **Windows:** run the installer. When Windows says it protected your PC, click **More info → Run anyway**.
+
+The first start loads the demo data in a few seconds, then shows the sign-in page with one-click users, as in the demo script below. Later starts take a second or two and keep everything done before.
+
+The **Demo** menu holds:
+- **Reset demo…** goes back to the demo data the app shipped with, in a few seconds.
+- **Reseed at today's date…** generates six months of history ending today, in 3–5 minutes.
+- **Open data folder** and **Open logs**, which help when something goes wrong. The data lives in `~/Library/Application Support/DMS Simulator` on macOS and in `%APPDATA%\DMS Simulator` on Windows; uninstalling the app leaves it there.
+
+To build the Mac installer yourself (needs `pg_dump` 17, for example from Homebrew's `postgresql@17`):
+
+```bash
+cd desktop && npm ci
+npm run build:dump            # seed a throwaway database, write the demo data (~4 min)
+npm run build:server          # Next.js standalone server
+npm run dist:mac              # release/DMS-Simulator-<version>-mac-<arch>.dmg
+npm run test:smoke            # launches the built app: start, sign-in, PDF, simulation, reset, reseed
+```
+
+Pushing a version tag (`git tag v0.2.0 && git push origin v0.2.0`) builds and smoke-tests the three installers on GitHub Actions and drafts a Release with them; publish the draft to make them downloadable.
+
 ## Demo script (about 30 minutes)
 
 Every step below changes stock, invoices, journal entries and KPIs in the same transaction: the point of the demo is to follow one action into the books.
 
 ### 0. Start from a clean database
+
+In the desktop app, use **Demo → Reset demo…** (or **Reseed at today's date…**) instead, and skip to the next paragraph. From a clone of the repository:
 
 ```bash
 npm run db:reset              # six months of history up to today, the last finished month locked
@@ -70,4 +101,4 @@ Every invoice, order form, repair order and warranty claim also prints as a PDF 
 
 ### Reset
 
-`npm run db:reset` returns to the seeded state at today's date.
+`npm run db:reset` returns to the seeded state at today's date. In the desktop app, **Demo → Reset demo…** or **Reseed at today's date…**.

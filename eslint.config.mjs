@@ -21,6 +21,8 @@ const eslintConfig = [
       ".next-e2e/**",
       ".next-e2e-build/**",
       ".next-preview/**",
+      ".next-desktop/**",
+      "desktop/**",
       "test-results/**",
       "playwright-report/**",
       "src/components/ui/**",

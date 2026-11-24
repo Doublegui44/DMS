@@ -1,0 +1,121 @@
+# Desktop app (Phase 12, D-087): installers for macOS (Apple Silicon, Intel) and Windows x64,
+# each smoke-tested on its own system. A version tag (v1.2.3) publishes them as a draft GitHub
+# Release; a manual run (Actions → Desktop → Run workflow) only keeps them as artifacts.
+name: Desktop
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  dump:
+    name: Demo data
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            desktop/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm ci
+        working-directory: desktop
+      - name: pg_dump 17
+        run: |
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
+      # Seeds a throwaway Postgres with six months of history ending today (a few minutes).
+      - run: node scripts/make-dump.mjs
+        working-directory: desktop
+        env:
+          PG_DUMP: /usr/lib/postgresql/17/bin/pg_dump
+      - uses: actions/upload-artifact@v4
+        with:
+          name: demo
+          path: desktop/build/demo
+
+  build:
+    name: ${{ matrix.name }}
+    needs: dump
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: macOS Apple Silicon, os: macos-15, target: --mac --arm64, artifact: mac-arm64 }
+          - { name: macOS Intel, os: macos-15-intel, target: --mac --x64, artifact: mac-x64 }
+          - { name: Windows x64, os: windows-latest, target: --win --x64, artifact: win-x64 }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            desktop/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm ci
+        working-directory: desktop
+      - uses: actions/download-artifact@v4
+        with:
+          name: demo
+          path: desktop/build/demo
+      - name: Version from the tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: desktop
+        run: npm version --no-git-tag-version --allow-same-version "${GITHUB_REF_NAME#v}"
+      - run: npm run build:server
+        working-directory: desktop
+      - run: npm run build:main && npx electron-builder ${{ matrix.target }} --publish never
+        working-directory: desktop
+      - name: Smoke test
+        run: npm run test:smoke
+        working-directory: desktop
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            desktop/release/*.dmg
+            desktop/release/*.exe
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ${{ matrix.artifact }}-traces
+          path: desktop/test-results
+          retention-days: 7
+
+  release:
+    name: Draft release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: installers
+          pattern: "{mac-arm64,mac-x64,win-x64}"
+          merge-multiple: true
+      - name: Draft GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" installers/* --repo "$GITHUB_REPOSITORY" --draft \
+            --title "DMS Simulator $GITHUB_REF_NAME" \
+            --notes "Desktop demo for macOS (Apple Silicon and Intel) and Windows. First launch: see the README, section Desktop app."

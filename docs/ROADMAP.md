@@ -134,23 +134,25 @@ Goal: an installer that anyone can run on a Mac or a Windows PC with nothing els
 - Secrets and settings: `DEMO_MODE=true`; `AUTH_SECRET` generated per install and kept in the user-data folder.
 - Window: splash screen while Postgres and the server start (with an error screen and "Open logs" if they fail), external links and PDFs open in the system browser or viewer, menu with Reset, Reseed, Open data folder, About, Quit.
 
-**Steps**
-- [ ] Standalone build: `next.config.ts` flag, Prisma binary targets, a script that assembles server + static + Prisma engines; check it runs with plain Node against a local database.
-- [ ] Postgres lifecycle in `desktop/`: init, start on a free port, stop, crash recovery; pure helpers (paths, port choice, dump/schema compatibility) with unit tests.
-- [ ] Demo dump: script that seeds a fresh embedded database and writes `demo.dump`; first-launch restore; Reset and Reseed menu items.
-- [ ] Electron shell: splash, window, menu, single instance, logs folder, external links and downloads.
-- [ ] Mac build: `.dmg` for Apple Silicon and Intel, built locally (`npm run desktop:build`).
-- [ ] Windows build: `.github/workflows/desktop.yml` on a version tag, matrix macOS arm64, macOS x64 and Windows x64. The dump is made once and shared between jobs; installers go to a draft GitHub Release.
-- [ ] Smoke tests with Playwright's Electron support, in that workflow on both systems: start, one-click sign-in, a dashboard, a PDF, a 1-day simulation, quit and relaunch (data kept), Reset.
-- [ ] README: download, first-launch steps for unsigned apps (macOS: System Settings → Privacy & Security → Open Anyway; Windows: More info → Run anyway), Reset and Reseed.
-- [ ] Decision log entries for the choices above.
+**Steps** (D-087)
+- [x] Standalone build: `NEXT_STANDALONE=1` in `next.config.ts` (pdfkit fonts traced by hand), `npm run build:server` assembles server + static + the bundled reseed, env files left out; runs with plain Node against a local database. Installers are built natively per system, so no extra Prisma engines.
+- [x] Postgres lifecycle in `desktop/`: `initdb` + `pg_ctl` from the embedded-postgres binaries, free port, clean stop, a server left by a crash stopped at next launch, stale lock removed; pure helpers (dump splitting, launch plan, connection string) unit-tested.
+- [x] Demo dump: `npm run build:dump` seeds a throwaway Postgres and writes `demo.sql.gz` + `manifest.json`; first-launch restore (~1 s); Reset and Reseed menu items.
+- [x] Electron shell: splash, window, menu, single instance, logs folder, external links and PDFs in the system apps.
+- [x] Mac build: `npm run dist:mac` builds a `.dmg` for the host's architecture (~206 MB, ad-hoc signed); Intel builds come from CI.
+- [ ] Windows build: `.github/workflows/desktop.yml` (written, not run yet) on a `v*` tag or by hand: dump made once on Linux, then macOS arm64, macOS x64 and Windows x64 built and smoke-tested, installers in a draft GitHub Release.
+- [x] Smoke tests with Playwright's Electron support (`npm run test:smoke`): first launch, one-click sign-in, dashboard, PDF, one simulated day, quit and relaunch (data and session kept), Reset, Reseed. Pass on macOS arm64; in CI on every system once the workflow runs.
+- [x] README: download, first-launch steps for unsigned apps, Reset and Reseed, building it yourself.
+- [x] Decision log: D-087.
+- [ ] First Windows installer tried by hand on a Windows PC.
 
-**Open questions (decide before starting)**
-- Distribution: the GitHub repository is private, so Release downloads and Electron auto-update need either a public releases-only repository or sending installers by hand. Auto-update comes after that choice.
-- Signing: start unsigned. Later, an Apple Developer ID ($99 a year, signing and notarisation) and a Windows certificate (for example Microsoft Trusted Signing, about $10 a month) remove the security warnings.
+**Decided**
+- Distribution: the repository is public, so the installers go to its own GitHub Releases. Auto-update can come later (electron-updater reads the same Releases).
+- Signing: unsigned for now (macOS ad-hoc, Open Anyway once; Windows SmartScreen once). Later, an Apple Developer ID ($99 a year, signing and notarisation) and a Windows certificate (for example Microsoft Trusted Signing, about $10 a month) remove the warnings.
 - Windows on ARM and Linux: out of scope unless someone needs them.
+- Still to do: an app icon (the default Electron icon is used).
 
-**Expect:** installers of roughly 250–400 MB; someone with a Windows PC tries the first installer by hand once.
+**Expect:** installers of roughly 200–300 MB; someone with a Windows PC tries the first installer by hand once.
 
 - **Done when:** on a clean Mac and a clean Windows PC, someone downloads the installer, opens the app, signs in with one click and runs the README demo script without installing anything else.
 

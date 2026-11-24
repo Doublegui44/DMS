@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+    <title>DMS Simulator</title>
+    <style>
+      :root { color-scheme: light dark; --bg: #f7f7f8; --fg: #18181b; --muted: #71717a; --accent: #18181b; }
+      @media (prefers-color-scheme: dark) { :root { --bg: #111113; --fg: #f4f4f5; --muted: #a1a1aa; --accent: #f4f4f5; } }
+      html, body { height: 100%; margin: 0; }
+      body { display: grid; place-items: center; background: var(--bg); color: var(--fg); font: 14px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif; }
+      main { text-align: center; }
+      .logo { width: 44px; height: 44px; border-radius: 10px; background: var(--accent); color: var(--bg); display: grid; place-items: center; margin: 0 auto 16px; font-weight: 700; }
+      h1 { font-size: 18px; margin: 0 0 6px; }
+      p { margin: 0; color: var(--muted); min-height: 21px; }
+      .bar { width: 220px; height: 3px; margin: 18px auto 0; overflow: hidden; border-radius: 2px; background: color-mix(in srgb, var(--fg) 12%, transparent); }
+      .bar::after { content: ""; display: block; width: 40%; height: 100%; background: var(--fg); animation: slide 1.2s ease-in-out infinite; }
+      @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+      @media (prefers-reduced-motion: reduce) { .bar::after { animation: none; width: 100%; opacity: 0.4; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="logo">DMS</div>
+      <h1>DMS Simulator</h1>
+      <p id="status">Starting…</p>
+      <div class="bar"></div>
+    </main>
+    <script>
+      window.setStatus = (text) => { document.getElementById("status").textContent = text; };
+    </script>
+  </body>
+</html>
