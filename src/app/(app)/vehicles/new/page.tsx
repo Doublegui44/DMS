@@ -5,8 +5,9 @@ import { PageHeader } from "@/components/shared/page-header";
 import { saveVehicleAction } from "../actions";
 import { VehicleForm } from "../vehicle-form";
 import { vehicleFormOptions } from "../form-data";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "New customer vehicle" };
+export const generateMetadata = pageTitle("newCustomerVehicle");
 
 export default async function NewVehiclePage() {
   const t = await getTranslations();

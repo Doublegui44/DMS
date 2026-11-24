@@ -8,6 +8,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { logout, setActiveSite, switchUser } from "@/app/(app)/shell-actions";
+import { LanguageSwitcher } from "./language-switcher";
 
 export interface TopbarProps {
   userName: string;
@@ -52,6 +53,8 @@ export function Topbar({ userName, roleLabels, sites, activeSiteId, businessDate
       </div>
 
       <div className="flex-1" />
+
+      <LanguageSwitcher />
 
       {demoUsers && (
         <DropdownMenu>

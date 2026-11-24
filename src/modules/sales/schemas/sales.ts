@@ -77,6 +77,17 @@ export const tradeInInputSchema = z.object({
 });
 export type TradeInInput = z.input<typeof tradeInInputSchema>;
 
+/** A used car to value on the market price feed (D-083). */
+export const marketQueryInputSchema = z.object({
+  make: z.string().trim().min(1, "Make is required"),
+  model: z.string().trim().min(1, "Model is required"),
+  firstRegistration: z.coerce.date({ errorMap: () => ({ message: "Enter the first registration date" }) }),
+  mileage: int.min(0, "Mileage cannot be negative"),
+  fuel: z.enum(FUELS),
+});
+/** Form values as typed (strings), parsed by the service. */
+export type MarketQueryInput = { make: string; model: string; firstRegistration: string | Date; mileage: string | number; fuel: string };
+
 export const financingInputSchema = z.object({
   kind: z.enum(["LOAN", "LEASE"]).default("LOAN"),
   lender: z.string().trim().min(1, "Choose a lender"),
@@ -126,6 +137,13 @@ export const deliveryInputSchema = z.object({
   registration: plate,
 });
 export type DeliveryInput = z.input<typeof deliveryInputSchema>;
+
+/** The manufacturer pushes a factory order back (OEM portal mock, D-084). */
+export const factoryDelayInputSchema = z.object({
+  days: z.coerce.number({ invalid_type_error: "Must be a number" }).int("Must be a whole number").min(1, "At least one day").max(90, "At most 90 days"),
+  reason: z.string().trim().min(3, "Give a reason").max(200),
+});
+export type FactoryDelayInput = { days: number | string; reason: string };
 
 export const reasonSchema = z.object({ reason: z.string().trim().min(3, "Give a reason").max(300) });
 

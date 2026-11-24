@@ -1,3 +1,4 @@
+import { formatLocale } from "./format-locale";
 /**
  * Money helpers. All amounts are integer cents. This is the ONLY place that rounds.
  * Rounding rule: half-up away from zero, to the cent (ROUND_HALF_UP).
@@ -116,7 +117,7 @@ const formatters = new Map<string, Intl.NumberFormat>();
 /** Format cents for display, e.g. 123456 → "€1,234.56". */
 export function formatMoney(cents: Cents | null | undefined, opts?: { locale?: string; currency?: string; decimals?: boolean }): string {
   if (cents === null || cents === undefined) return "—";
-  const locale = opts?.locale ?? "en-GB";
+  const locale = opts?.locale ?? formatLocale();
   const currency = opts?.currency ?? "EUR";
   const decimals = opts?.decimals ?? true;
   const key = `${locale}|${currency}|${decimals}`;
@@ -134,6 +135,6 @@ export function formatMoney(cents: Cents | null | undefined, opts?: { locale?: s
 }
 
 /** Format basis points as a percentage string, e.g. 2000 → "20.00 %". */
-export function formatBp(bp: number, decimals = 2): string {
-  return `${(bp / 100).toFixed(decimals)} %`;
+export function formatBp(bp: number, decimals = 2, locale?: string): string {
+  return `${(bp / 100).toLocaleString(locale ?? formatLocale(), { minimumFractionDigits: decimals, maximumFractionDigits: decimals })} %`;
 }

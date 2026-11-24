@@ -41,11 +41,12 @@ export function CustomerForm({
   cancelHref: string;
 }) {
   const t = useTranslations("customer");
+  const tu = useTranslations("ui");
   const [kind, setKind] = useState(initial?.kind ?? "INDIVIDUAL");
   const isIndividual = kind === "INDIVIDUAL";
 
   return (
-    <ActionForm action={action} submitLabel={submitLabel} cancelHref={cancelHref} successMessage="Saved">
+    <ActionForm action={action} submitLabel={submitLabel} cancelHref={cancelHref} successMessage={tu("saved")}>
       {(e) => (
         <div className="grid gap-6 lg:grid-cols-2">
           <fieldset className="space-y-3 rounded-lg border bg-card p-4">
@@ -114,7 +115,7 @@ export function CustomerForm({
           </fieldset>
 
           <fieldset className="space-y-3 rounded-lg border bg-card p-4">
-            <legend className="px-1 text-sm font-semibold">Contact</legend>
+            <legend className="px-1 text-sm font-semibold">{tu("contact")}</legend>
             <div className="grid grid-cols-2 gap-3">
               <Field label={t("email")} name="email" error={e.email}>
                 <TextInput name="email" type="email" defaultValue={initial?.email ?? ""} invalid={!!e.email} />

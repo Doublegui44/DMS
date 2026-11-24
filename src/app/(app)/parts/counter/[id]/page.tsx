@@ -13,8 +13,9 @@ import { SpecForm } from "@/components/shared/spec-form";
 import { ActionButton } from "@/components/shared/action-button";
 import { addCounterLineAction, cancelCounterSaleAction, confirmCounterSaleAction, invoiceCounterSaleAction, removeCounterLineAction } from "../../actions";
 import { bpToPercent, fmtQty } from "../../format";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Counter sale" };
+export const generateMetadata = pageTitle("counterSale");
 
 export default async function CounterSalePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

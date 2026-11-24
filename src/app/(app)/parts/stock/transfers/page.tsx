@@ -9,8 +9,9 @@ import { listTransfers } from "@/modules/parts";
 import { DataTable, type Row } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Stock transfers" };
+export const generateMetadata = pageTitle("stockTransfers");
 
 export default async function TransfersPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;

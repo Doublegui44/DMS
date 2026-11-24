@@ -1,3 +1,4 @@
+import { formatNumber } from "@/lib/format-locale";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Plus } from "lucide-react";
@@ -9,8 +10,9 @@ import { ageingLevel, listVehicles, type VehicleStatus } from "@/modules/core";
 import { DataTable, type Row } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Vehicles" };
+export const generateMetadata = pageTitle("vehicles");
 
 const STATUSES: VehicleStatus[] = ["ORDERED", "IN_TRANSIT", "IN_STOCK", "INTAKE", "RECONDITIONING", "FOR_SALE", "RESERVED", "SOLD", "DELIVERED", "CUSTOMER"];
 
@@ -34,7 +36,7 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
       status: { kind: "badge", status: v.status, label: t(`statuses.${v.status}`) },
       site: v.site?.code ?? null,
       owner: v.owner ? { kind: "link", href: `/customers/${v.owner.id}`, label: v.owner.displayName } : null,
-      mileage: v.mileage.toLocaleString("en-GB"),
+      mileage: formatNumber(v.mileage),
       listPriceCents: { kind: "money", cents: v.listPriceCents },
       stockValueCents: v.stockType === "NONE" ? null : { kind: "money", cents: v.stockValueCents },
       stockInDate:

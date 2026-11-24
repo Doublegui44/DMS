@@ -13,8 +13,9 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { inputClass } from "@/components/shared/form";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Sales pipeline" };
+export const generateMetadata = pageTitle("salesPipeline");
 
 function Card({ c, t }: { c: PipelineCard; t: Awaited<ReturnType<typeof getTranslations>> }) {
   const doc = c.order ?? c.quote;

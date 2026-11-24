@@ -5,8 +5,9 @@ import { formatMoney } from "@/lib/money";
 import { getStockValueReport } from "@/modules/reports";
 import { PageHeader, Section } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Stock value" };
+export const generateMetadata = pageTitle("stockValue");
 
 export default async function StockValuePage() {
   const t = await getTranslations("reports");

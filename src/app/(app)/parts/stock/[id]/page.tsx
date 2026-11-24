@@ -10,8 +10,9 @@ import { SpecForm } from "@/components/shared/spec-form";
 import { setStockLevelsAction } from "../../actions";
 import { fmtQty, pmpCents, qtyInput } from "../../format";
 import { sourceHref } from "../source-link";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Stock item" };
+export const generateMetadata = pageTitle("stockItem");
 
 export default async function StockItemPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

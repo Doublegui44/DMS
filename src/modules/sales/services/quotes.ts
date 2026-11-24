@@ -417,7 +417,7 @@ export async function submitQuote(ctx: ServiceContext, quoteId: string) {
         siteId: quote.siteId,
         requestedById,
         businessDate: ctx.businessDate,
-        comment: `Effective discount ${formatBp(quote.discountBp)}`,
+        comment: `Effective discount ${formatBp(quote.discountBp, 2, "en-GB")}`,
       },
     });
     return setQuoteStatus(ctx, quote, "PENDING_APPROVAL");

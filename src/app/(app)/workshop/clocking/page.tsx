@@ -8,8 +8,9 @@ import { SpecForm } from "@/components/shared/spec-form";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { clockOffAction, clockOnAction } from "../actions";
 import { clock, hours, nowHhmm } from "../format";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Clocking" };
+export const generateMetadata = pageTitle("clocking");
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? null;
 

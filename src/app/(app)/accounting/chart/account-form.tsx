@@ -17,6 +17,8 @@ export interface AccountFormValues {
 
 export function AccountForm({ initial }: { initial?: AccountFormValues }) {
   const t = useTranslations("accounting");
+  const tu = useTranslations("ui");
+  const tc = useTranslations("common");
   const check = (name: keyof AccountFormValues, label: string, def: boolean) => (
     <label className="flex items-center gap-2 text-sm">
       <input type="checkbox" name={name} defaultChecked={(initial?.[name] as boolean | undefined) ?? def} /> {label}
@@ -25,8 +27,8 @@ export function AccountForm({ initial }: { initial?: AccountFormValues }) {
   return (
     <ActionForm
       action={saveAccountAction.bind(null, initial?.code ?? null)}
-      submitLabel={initial ? "Save" : "Create"}
-      successMessage="Account saved"
+      submitLabel={initial ? tc("save") : tc("create")}
+      successMessage={tu("accountSaved")}
       cancelHref={initial ? `/accounting/chart/${initial.code}` : "/accounting/chart"}
     >
       {(e) => (

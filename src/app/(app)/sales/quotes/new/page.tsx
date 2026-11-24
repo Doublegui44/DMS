@@ -6,8 +6,9 @@ import { getQuoteFormData } from "@/modules/sales";
 import { PageHeader } from "@/components/shared/page-header";
 import { QuoteBuilder } from "../quote-builder";
 import { emptyDraft, toBuilderData } from "../draft";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "New quote" };
+export const generateMetadata = pageTitle("newQuote");
 
 export default async function NewQuotePage({ searchParams }: { searchParams: Promise<{ lead?: string }> }) {
   const { lead: leadId } = await searchParams;

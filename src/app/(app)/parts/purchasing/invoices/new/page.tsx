@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { TableForm } from "../../../table-form";
 import { recordSupplierInvoiceAction } from "../../../actions";
 import { centsToInput, fmtQty, qtyInput } from "../../../format";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "New supplier invoice" };
+export const generateMetadata = pageTitle("newSupplierInvoice");
 
 /** Step 1 (GET form): site and supplier. Step 2: tick the receipt lines the invoice bills, at the supplier's prices. */
 export default async function NewSupplierInvoicePage({ searchParams }: { searchParams: Promise<{ site?: string; supplier?: string }> }) {

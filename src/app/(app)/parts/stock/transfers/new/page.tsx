@@ -4,8 +4,9 @@ import { getTransferFormData } from "@/modules/parts";
 import { PageHeader, Section } from "@/components/shared/page-header";
 import { TableForm } from "../../../table-form";
 import { transferStockAction } from "../../../actions";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "New transfer" };
+export const generateMetadata = pageTitle("newTransfer");
 
 export default async function NewTransferPage() {
   const t = await getTranslations("parts");

@@ -32,6 +32,7 @@ export function InvoiceForm(props: {
   revenueKeys: Option[];
 }) {
   const t = useTranslations("accounting");
+  const tu = useTranslations("ui");
   const router = useRouter();
   const [pending, start] = useTransition();
   const [siteId, setSiteId] = useState(props.defaultSiteId);
@@ -58,7 +59,7 @@ export function InvoiceForm(props: {
       const res = await saveInvoiceAction({ siteId, customerId, notes, issue, lines });
       if (!res) return;
       if (res.ok) {
-        toast.success(issue ? "Invoice issued" : "Draft saved");
+        toast.success(issue ? tu("invoiceIssued") : tu("draftSaved"));
         router.push(res.data.redirectTo!);
       } else {
         setErrors(res.error.fieldErrors ?? {});

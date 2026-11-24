@@ -10,8 +10,9 @@ import { inputClass } from "@/components/shared/form";
 import { Button } from "@/components/ui/button";
 import { bookAppointmentAction } from "../../actions";
 import { vehicleName } from "../../format";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Book an appointment" };
+export const generateMetadata = pageTitle("bookAnAppointment");
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? null;
 

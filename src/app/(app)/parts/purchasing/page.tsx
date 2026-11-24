@@ -9,8 +9,9 @@ import { getPartFormData, listPurchaseOrders } from "@/modules/parts";
 import { DataTable, type Row } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Parts purchasing" };
+export const generateMetadata = pageTitle("partsPurchasing");
 
 const STATUSES = ["DRAFT", "SENT", "PARTIAL", "RECEIVED", "CLOSED", "CANCELLED"] as const;
 

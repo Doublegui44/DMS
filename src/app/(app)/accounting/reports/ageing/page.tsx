@@ -8,8 +8,9 @@ import { AGEING_BUCKETS, getPayablesAgeing, getReceivablesAgeing } from "@/modul
 import { DataTable, type Row } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
 import { cn } from "@/lib/utils";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Ageing balance" };
+export const generateMetadata = pageTitle("ageingBalance");
 
 export default async function AgeingPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;

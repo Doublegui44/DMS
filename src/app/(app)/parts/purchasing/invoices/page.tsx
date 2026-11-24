@@ -9,8 +9,9 @@ import { getPartFormData, listSupplierInvoices } from "@/modules/parts";
 import { DataTable, type Row } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Supplier invoices" };
+export const generateMetadata = pageTitle("supplierInvoices");
 
 const STATUSES = ["VARIANCE", "MATCHED", "PAID", "REJECTED"] as const;
 

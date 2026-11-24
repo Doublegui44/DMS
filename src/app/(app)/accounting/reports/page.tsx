@@ -5,8 +5,9 @@ import { getRequestContext, query } from "@/lib/session";
 import { PageHeader, Section } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { inputClass } from "@/components/shared/form";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Reports" };
+export const generateMetadata = pageTitle("reports");
 
 const REPORTS = [
   { key: "pnl", href: "/accounting/reports/pnl" },

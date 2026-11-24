@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
-  BarChart3, Banknote, BookOpen, BookText, BookUser, Boxes, Car, CarFront, CalendarDays, ClipboardCheck, ClipboardList, Factory, FlaskConical,
+  BarChart3, Banknote, BookOpen, BookText, BookUser, Boxes, Car, CarFront, CalendarDays, ClipboardCheck, ClipboardList, Factory, FlaskConical, Globe,
   History, KanbanSquare, KeyRound, LayoutDashboard, ListTree, Lock, Package, Receipt, Settings, ShieldCheck,
   Scale, ScrollText, ShoppingCart, Timer, Truck, UserCog, Users, Wrench, Gauge, ListChecks, type LucideIcon,
 } from "lucide-react";
@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import type { NavGroup } from "./nav";
 
 const ICONS: Record<string, LucideIcon> = {
-  BarChart3, Banknote, BookOpen, BookText, BookUser, Boxes, Car, CarFront, CalendarDays, ClipboardCheck, ClipboardList, Factory, FlaskConical,
+  BarChart3, Banknote, BookOpen, BookText, BookUser, Boxes, Car, CarFront, CalendarDays, ClipboardCheck, ClipboardList, Factory, FlaskConical, Globe,
   History, KanbanSquare, KeyRound, LayoutDashboard, ListTree, Lock, Package, Receipt, Settings, ShieldCheck,
   Scale, ScrollText, ShoppingCart, Timer, Truck, UserCog, Users, Wrench, Gauge, ListChecks,
 };
@@ -21,6 +21,7 @@ export function Sidebar({ groups }: { groups: NavGroup[] }) {
   const pathname = usePathname();
   const t = useTranslations("nav");
   const tApp = useTranslations("app");
+  const tu = useTranslations("ui");
   return (
     <aside className="hidden w-56 shrink-0 border-r bg-sidebar text-sidebar-foreground md:flex md:flex-col">
       <div className="flex h-12 items-center gap-2 border-b px-4">
@@ -29,7 +30,7 @@ export function Sidebar({ groups }: { groups: NavGroup[] }) {
         </div>
         <span className="text-sm font-semibold tracking-tight">{tApp("name")}</span>
       </div>
-      <nav className="flex-1 overflow-y-auto px-2 py-3" aria-label="Main">
+      <nav className="flex-1 overflow-y-auto px-2 py-3" aria-label={tu("mainMenu")}>
         {groups.map((group) => (
           <div key={group.key} className="mb-3">
             {group.key !== "dashboard" && (

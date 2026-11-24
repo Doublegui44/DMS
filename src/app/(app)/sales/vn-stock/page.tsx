@@ -10,8 +10,9 @@ import { listVnStock } from "@/modules/sales";
 import { DataTable, type Row } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "New-vehicle stock" };
+export const generateMetadata = pageTitle("newVehicleStock");
 
 export default async function VnStockPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;

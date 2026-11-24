@@ -3,13 +3,15 @@ import { db } from "@/lib/db";
 import { getRequestContext } from "@/lib/session";
 import { can } from "@/lib/rbac";
 import { formatDate, localToday } from "@/lib/dates";
-import { ROLE_LABELS, type RoleKey } from "@/modules/admin";
+import { getTranslations } from "next-intl/server";
 import { NAV } from "@/components/shell/nav";
 import { Sidebar } from "@/components/shell/sidebar";
 import { Topbar } from "@/components/shell/topbar";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { actor, siteId, sites } = await getRequestContext();
+  const tRole = await getTranslations("roles");
+  const tc = await getTranslations("common");
 
   // Menus are filtered by the "view" permission on each screen's resource.
   const groups = NAV.map((g) => ({
@@ -36,9 +38,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         .map((u) => ({
           email: u.email,
           name: `${u.firstName} ${u.lastName}`,
-          role: u.roles[0]?.role.name ?? "",
+          role: u.roles[0] ? tRole(u.roles[0].role.key) : "",
           roleKey: u.roles[0]?.role.key ?? "",
-          site: u.roles[0]?.site?.code ?? "All",
+          site: u.roles[0]?.site?.code ?? tc("groupWide"),
         }))
         .sort((a, b) => a.roleKey.localeCompare(b.roleKey) || a.site.localeCompare(b.site))
     : null;
@@ -49,7 +51,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar
           userName={actor.name}
-          roleLabels={actor.roleKeys.map((k) => ROLE_LABELS[k as RoleKey] ?? k)}
+          roleLabels={actor.roleKeys.map((k) => (tRole.has(k) ? tRole(k) : k))}
           sites={sites}
           activeSiteId={siteId}
           businessDate={businessDate}

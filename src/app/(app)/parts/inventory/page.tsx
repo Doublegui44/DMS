@@ -9,8 +9,9 @@ import { listCycleCounts } from "@/modules/parts";
 import { DataTable, type Row } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Cycle counts" };
+export const generateMetadata = pageTitle("cycleCounts");
 
 const STATUSES = ["OPEN", "POSTED", "CANCELLED"] as const;
 

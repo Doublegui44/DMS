@@ -11,8 +11,9 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { SpecForm } from "@/components/shared/spec-form";
 import { decideSupplierInvoiceAction, paySupplierInvoiceAction } from "../../../actions";
 import { fmtQty } from "../../../format";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Supplier invoice" };
+export const generateMetadata = pageTitle("supplierInvoice");
 
 export default async function SupplierInvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

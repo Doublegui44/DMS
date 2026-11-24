@@ -12,8 +12,9 @@ import { ActionButton } from "@/components/shared/action-button";
 import { TableForm } from "../../table-form";
 import { cancelCycleCountAction, saveCountsAction } from "../../actions";
 import { fmtQty, qtyInput } from "../../format";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Cycle count" };
+export const generateMetadata = pageTitle("cycleCount");
 
 export default async function CycleCountPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

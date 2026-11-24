@@ -1,3 +1,4 @@
+import { formatKm } from "@/lib/format-locale";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Plus } from "lucide-react";
@@ -9,8 +10,9 @@ import { listVoStock } from "@/modules/sales";
 import { DataTable, type Row } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Used-vehicle stock" };
+export const generateMetadata = pageTitle("usedVehicleStock");
 
 export default async function VoStockPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
@@ -26,7 +28,7 @@ export default async function VoStockPage({ searchParams }: { searchParams: Prom
       id: v.id,
       make: { kind: "link", href: `/sales/vo-stock/${v.id}`, label: `${v.make} ${v.model}`, sub: v.version },
       registration: { kind: "mono", value: v.registration },
-      mileage: v.mileage === null ? null : `${v.mileage.toLocaleString("en-GB")} km`,
+      mileage: v.mileage === null ? null : formatKm(v.mileage),
       status: { kind: "badge", status: v.status, label: t(`vehicleStatuses.${v.status}`) },
       vatRegime: { kind: "badge", status: v.vatRegime === "MARGIN" ? "VO" : "VN", label: t(`vatRegimes.${v.vatRegime}`) },
       stockInDate: { kind: "date", iso: v.stockInDate ? isoDate(v.stockInDate) : null },

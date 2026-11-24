@@ -12,8 +12,9 @@ import { SpecForm } from "@/components/shared/spec-form";
 import { Button } from "@/components/ui/button";
 import { inputClass } from "@/components/shared/form";
 import { decideClaimAction, warrantyRemittanceAction } from "../actions";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Warranty claims" };
+export const generateMetadata = pageTitle("warrantyClaims");
 
 const STATUSES = ["SUBMITTED", "ACCEPTED", "REJECTED", "PAID"] as const;
 

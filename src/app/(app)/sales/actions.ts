@@ -13,7 +13,9 @@ import {
   createQuote,
   decideQuoteApproval,
   declineQuote,
+  delayFactoryOrder,
   deliverOrder,
+  getMarketValuation,
   invoiceOrder,
   orderForStock,
   previewQuote,
@@ -32,6 +34,7 @@ import {
   updateQuote,
   type DepositInput,
   type LeadInput,
+  type MarketQueryInput,
   type QuoteInput,
   type QuotePreview,
   type VehicleCostInput,
@@ -76,6 +79,11 @@ export async function loseLeadAction(leadId: string, _prev: FormState, fd: FormD
 // ── Quotes ──────────────────────────────────────────────────
 
 /** Live pricing for the quote builder: nothing is saved. */
+/** The market price feed (mock, D-083): a used car's trade value with its comparables. */
+export async function marketValuationAction(input: MarketQueryInput) {
+  return command((ctx) => getMarketValuation(ctx, input));
+}
+
 export async function previewQuoteAction(input: QuoteInput): Promise<ActionResult<QuotePreview>> {
   return command((ctx) => previewQuote(ctx, input));
 }
@@ -194,6 +202,14 @@ export async function shipFactoryOrderAction(vehicleId: string, factoryOrderId: 
   if (!res.ok) return res;
   revalidateSales();
   return ok(vehicleId);
+}
+
+/** The manufacturer pushes the promised date back (OEM portal mock, D-084). */
+export async function delayFactoryOrderAction(factoryOrderId: string, _prev: FormState, fd: FormData): Promise<FormState> {
+  const res = await command((ctx) => delayFactoryOrder(ctx, factoryOrderId, { days: text(fd, "days"), reason: text(fd, "reason") }));
+  if (!res.ok) return res;
+  revalidateSales();
+  return ok(factoryOrderId);
 }
 
 export async function receiveVehicleAction(vehicleId: string, _prev: FormState, fd: FormData): Promise<FormState> {

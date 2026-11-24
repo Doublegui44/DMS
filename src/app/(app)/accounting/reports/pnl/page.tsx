@@ -7,8 +7,9 @@ import { getProfitAndLoss, type DepartmentColumn, type PnlFigures, type PnlSecti
 import { PageHeader, Section } from "@/components/shared/page-header";
 import { ReportFilters } from "../filters";
 import { rangeFrom } from "../params";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "P&L by department" };
+export const generateMetadata = pageTitle("pAndLByDepartment");
 
 const SECTIONS: PnlSection[] = ["REVENUE", "COST_OF_SALES", "EXPENSES", "OTHER_INCOME"];
 

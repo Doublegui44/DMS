@@ -2,6 +2,7 @@
 
 import { useOptimistic, useTransition } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { ACTIONS } from "@/lib/rbac";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,7 @@ export function PermissionMatrix({
   modules: { module: string; resources: string[] }[];
   canEdit: boolean;
 }) {
+  const tu = useTranslations("ui");
   const [, start] = useTransition();
   const [optimistic, setOptimistic] = useOptimistic(new Set(granted), (state, change: { key: string; on: boolean }) => {
     const next = new Set(state);
@@ -40,7 +42,7 @@ export function PermissionMatrix({
 
   return (
     <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
-      <nav className="rounded-lg border bg-card p-1.5" aria-label="Roles">
+      <nav className="rounded-lg border bg-card p-1.5" aria-label={tu("roles")}>
         {roles.map((r) => (
           <Link
             key={r.id}
@@ -59,7 +61,7 @@ export function PermissionMatrix({
         <table className="w-full text-[13px]" data-testid="permission-matrix">
           <thead className="bg-muted/50 text-xs text-muted-foreground">
             <tr>
-              <th className="px-3 py-2 text-left font-medium">Resource</th>
+              <th className="px-3 py-2 text-left font-medium">{tu("resource")}</th>
               {ACTIONS.map((a) => (
                 <th key={a} className="px-3 py-2 text-center font-medium capitalize">
                   {a}

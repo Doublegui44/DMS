@@ -12,8 +12,9 @@ import { ActionButton } from "@/components/shared/action-button";
 import { Button } from "@/components/ui/button";
 import { removeSupersessionAction, setStockLevelsAction, supersedePartAction } from "../../actions";
 import { bpToPercent, fmtQty, pmpCents, qtyInput } from "../../format";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Part" };
+export const generateMetadata = pageTitle("part");
 
 export default async function PartPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

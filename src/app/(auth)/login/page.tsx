@@ -1,12 +1,13 @@
-import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { auth, DEMO_MODE } from "@/auth";
 import { db } from "@/lib/db";
-import { ROLE_KEYS, ROLE_LABELS, type RoleKey } from "@/modules/admin";
+import { ROLE_KEYS, type RoleKey } from "@/modules/admin";
+import { LanguageSwitcher } from "@/components/shell/language-switcher";
 import { LoginForm, DemoUserButton } from "./login-form";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata: Metadata = { title: "Sign in" };
+export const generateMetadata = pageTitle("signIn");
 
 export default async function LoginPage() {
   const session = await auth();
@@ -16,6 +17,8 @@ export default async function LoginPage() {
   if (current) redirect("/dashboard");
   const t = await getTranslations("login");
   const tApp = await getTranslations("app");
+  const tRole = await getTranslations("roles");
+  const tc = await getTranslations("common");
 
   const users = DEMO_MODE
     ? await db.user.findMany({
@@ -35,7 +38,10 @@ export default async function LoginPage() {
   }
 
   return (
-    <main className="grid min-h-dvh place-items-center bg-muted/40 p-4">
+    <main className="relative grid min-h-dvh place-items-center bg-muted/40 p-4">
+      <div className="absolute right-4 top-4">
+        <LanguageSwitcher />
+      </div>
       <div className="grid w-full max-w-4xl gap-6 md:grid-cols-[minmax(0,320px)_1fr]">
         <div className="rounded-xl border bg-card p-6 shadow-sm">
           <div className="mb-6">
@@ -56,7 +62,7 @@ export default async function LoginPage() {
               {ROLE_KEYS.filter((k) => byRole.has(k)).map((key) => (
                 <div key={key}>
                   <div className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                    {ROLE_LABELS[key]}
+                    {tRole(key)}
                   </div>
                   <ul className="space-y-0.5">
                     {byRole.get(key)!.map((u) => (
@@ -64,7 +70,7 @@ export default async function LoginPage() {
                         <DemoUserButton
                           email={u.email}
                           label={`${u.firstName} ${u.lastName}`}
-                          sub={u.roles[0]?.site?.code ?? "All sites"}
+                          sub={u.roles[0]?.site?.code ?? tc("groupWide")}
                         />
                       </li>
                     ))}

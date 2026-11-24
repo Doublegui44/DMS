@@ -7,8 +7,9 @@ import { formatDate } from "@/lib/dates";
 import { getTransfer } from "@/modules/parts";
 import { Fields, PageHeader, Section } from "@/components/shared/page-header";
 import { fmtQty, pmpCents } from "../../../format";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Transfer" };
+export const generateMetadata = pageTitle("transfer");
 
 export default async function TransferPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

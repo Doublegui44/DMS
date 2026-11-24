@@ -8,8 +8,9 @@ import { listCustomers } from "@/modules/core";
 import { DataTable, type Row } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Customers" };
+export const generateMetadata = pageTitle("customers");
 
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const p = parseListParams(await searchParams, { sort: "displayName", dir: "asc" });

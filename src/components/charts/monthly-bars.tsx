@@ -1,11 +1,12 @@
 "use client";
 
+import { formatLocale } from "@/lib/format-locale";
 import { Bar, BarChart, CartesianGrid, Legend, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export type Series = { key: string; label: string; color: string };
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const monthLabel = (ym: string) => `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(2, 4)}`;
+const monthLabel = (ym: string) =>
+  new Intl.DateTimeFormat(formatLocale(), { month: "short", year: "2-digit", timeZone: "UTC" }).format(new Date(`${ym.slice(0, 7)}-01T00:00:00Z`));
 
 /**
  * Grouped bars per month (one bar per series), one y-axis. Series keep a fixed color slot
@@ -14,7 +15,7 @@ const monthLabel = (ym: string) => `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.s
 export function MonthlyBars({ data, series, money = false, testId }: { data: Record<string, number | string>[]; series: Series[]; money?: boolean; testId?: string }) {
   const fmt = (v: number, compact = false) =>
     money
-      ? new Intl.NumberFormat("en-GB", { style: "currency", currency: "EUR", notation: compact ? "compact" : "standard", maximumFractionDigits: compact ? 1 : 0 }).format(v / 100)
+      ? new Intl.NumberFormat(formatLocale(), { style: "currency", currency: "EUR", notation: compact ? "compact" : "standard", maximumFractionDigits: compact ? 1 : 0 }).format(v / 100)
       : String(v);
   return (
     <div className="h-64 w-full text-xs" data-testid={testId}>

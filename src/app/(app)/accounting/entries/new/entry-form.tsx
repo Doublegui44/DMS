@@ -36,6 +36,7 @@ export function EntryForm(props: {
   suppliers: Option[];
 }) {
   const t = useTranslations("accounting");
+  const tu = useTranslations("ui");
   const router = useRouter();
   const [pending, start] = useTransition();
   const [head, setHead] = useState({ journalCode: "OD", siteId: props.defaultSiteId, entryDate: props.defaultDate, label: "" });
@@ -67,7 +68,7 @@ export function EntryForm(props: {
       const res = await postEntryAction({ ...head, lines });
       if (!res) return;
       if (res.ok) {
-        toast.success("Entry posted");
+        toast.success(tu("entryPosted"));
         router.push(res.data.redirectTo!);
       } else {
         setErrors(res.error.fieldErrors ?? {});
@@ -126,7 +127,7 @@ export function EntryForm(props: {
                       value={l.accountCode}
                       onChange={(e) => update(i, { accountCode: e.target.value.trim() })}
                     />
-                    <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{acc?.label ?? (l.accountCode ? "Unknown account" : "")}</div>
+                    <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{acc?.label ?? (l.accountCode ? tu("unknownAccount") : "")}</div>
                   </td>
                   <td className="py-1 pr-2">
                     <input aria-label={`Line ${i + 1} label`} className={inputClass} value={l.label} placeholder={head.label} onChange={(e) => update(i, { label: e.target.value })} />

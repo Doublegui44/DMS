@@ -5,14 +5,16 @@ import { parseListParams, type SearchParams } from "@/lib/list";
 import { listAuditLog } from "@/modules/admin";
 import { DataTable, type Row } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Activity log" };
+export const generateMetadata = pageTitle("activityLog");
 
 const ENTITY_LINKS: Record<string, string> = { Customer: "/customers", Vehicle: "/vehicles" };
 
 export default async function AuditPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const p = parseListParams(await searchParams, { sort: "at", dir: "desc", pageSize: 50 });
   const t = await getTranslations("admin");
+  const tu = await getTranslations("ui");
   const data = await query((ctx) => listAuditLog(ctx, p), { resource: "admin.audit", action: "view" });
 
   const rows: Row[] = data.rows.map((a) => ({
@@ -38,9 +40,9 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
         exportHref="/api/export/audit"
         columns={[
           { key: "at", header: t("at"), sortable: true },
-          { key: "businessDate", header: "Business date" },
+          { key: "businessDate", header: tu("businessDate") },
           { key: "user", header: t("user") },
-          { key: "site", header: "Site" },
+          { key: "site", header: tu("site") },
           { key: "action", header: t("action"), sortable: true },
           { key: "entity", header: t("entity") },
         ]}

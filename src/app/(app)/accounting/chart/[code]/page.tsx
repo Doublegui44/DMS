@@ -14,6 +14,7 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
   const { code } = await params;
   const p = parseListParams(await searchParams, { pageSize: 50 });
   const t = await getTranslations("accounting");
+  const tu = await getTranslations("ui");
   const { actor } = await getRequestContext();
   const [a, lines] = await Promise.all([query((ctx) => getAccount(ctx, code)), query((ctx) => listAccountLines(ctx, code, p))]);
   const yes = "✓";
@@ -43,7 +44,7 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
           )
         }
       />
-      <Section title="Settings">
+      <Section title={tu("accountSettings")}>
         <Fields
           items={[
             { label: t("postable"), value: a.postable ? yes : "—" },

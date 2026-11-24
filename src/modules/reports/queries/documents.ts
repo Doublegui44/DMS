@@ -1,3 +1,4 @@
+import { formatKm } from "@/lib/format-locale";
 import type { ServiceContext } from "@/lib/context";
 import { NotFoundError } from "@/lib/errors";
 import { getSetting } from "@/modules/core";
@@ -110,7 +111,7 @@ async function orderDoc(ctx: ServiceContext, id: string): Promise<PrintDoc> {
     ...(o.salesperson ? [{ key: "salesperson", text: `${o.salesperson.firstName} ${o.salesperson.lastName}` }] : []),
   ];
   const notes: string[] = [];
-  if (q.tradeIn) notes.push(`${vehicleText(q.tradeIn)} · ${q.tradeIn.registration ?? q.tradeIn.vin} · ${q.tradeIn.mileage.toLocaleString("en-GB")} km`);
+  if (q.tradeIn) notes.push(`${vehicleText(q.tradeIn)} · ${q.tradeIn.registration ?? q.tradeIn.vin} · ${formatKm(q.tradeIn.mileage)}`);
   if (q.financing) notes.push(`${q.financing.lender} · ${q.financing.months} × ${(q.financing.monthlyPaymentCents / 100).toFixed(2)}`);
   if (q.notes) notes.push(q.notes);
   return {
@@ -158,7 +159,7 @@ async function repairOrderDoc(ctx: ServiceContext, id: string): Promise<PrintDoc
     { key: "vehicle", text: vehicleText(v) },
     { key: "vin", text: v.vin },
     ...(v.registration ? [{ key: "registration", text: v.registration }] : []),
-    { key: "mileageIn", text: `${ro.mileageIn.toLocaleString("en-GB")} km` },
+    { key: "mileageIn", text: formatKm(ro.mileageIn) },
     { key: "fuelLevel", text: `${ro.fuelLevelPct} %` },
     ...(ro.advisor ? [{ key: "advisor", text: `${ro.advisor.firstName} ${ro.advisor.lastName}` }] : []),
   ];
@@ -197,7 +198,7 @@ async function warrantyClaimDoc(ctx: ServiceContext, id: string): Promise<PrintD
     { key: "vehicle", text: vehicleText(v) },
     { key: "vin", text: v.vin },
     ...(v.firstRegistration ? [{ key: "firstRegistration", date: v.firstRegistration }] : []),
-    { key: "mileageIn", text: `${c.ro.mileageIn.toLocaleString("en-GB")} km` },
+    { key: "mileageIn", text: formatKm(c.ro.mileageIn) },
     { key: "status", text: c.status },
     ...(c.job.technician ? [{ key: "technician", text: `${c.job.technician.firstName} ${c.job.technician.lastName}` }] : []),
   ];

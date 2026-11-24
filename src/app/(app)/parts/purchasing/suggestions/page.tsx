@@ -9,8 +9,9 @@ import { ActionButton } from "@/components/shared/action-button";
 import { Button } from "@/components/ui/button";
 import { createSuggestedOrdersAction } from "../../actions";
 import { fmtQty } from "../../format";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Suggested orders" };
+export const generateMetadata = pageTitle("suggestedOrders");
 
 export default async function SuggestionsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;

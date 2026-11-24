@@ -5,8 +5,9 @@ import { PageHeader, Section } from "@/components/shared/page-header";
 import { TableForm } from "../../table-form";
 import { saveDiscountMatrixAction } from "../../actions";
 import { bpToPercent } from "../../format";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Discount matrix" };
+export const generateMetadata = pageTitle("discountMatrix");
 
 export default async function DiscountMatrixPage() {
   const t = await getTranslations("parts");

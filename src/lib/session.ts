@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 // Registers every module's domain-event handlers before any command runs (D-031).
 import "@/modules/register";
+import { getUiLocale } from "@/i18n/current";
+import { translateActionResult } from "@/i18n/server-messages";
 import { db } from "./db";
 import { loadActor } from "./actor";
 import { runCommand, runQuery, type Actor, type CommandOptions, type ServiceContext } from "./context";
@@ -19,6 +21,7 @@ export interface RequestContext {
 
 /** Current user + active site, or redirect to /login. Cached per request. */
 export const getRequestContext = cache(async (): Promise<RequestContext> => {
+  await getUiLocale(); // sets the number/date locale of this request
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   const actor = await loadActor(session.user.id);
@@ -56,7 +59,7 @@ export async function command<T>(
   } catch (err) {
     // Let Next.js redirects/notFound propagate.
     if (err && typeof err === "object" && "digest" in err) throw err;
-    return toActionError(err);
+    return translateActionResult(toActionError(err), await getUiLocale());
   }
 }
 
@@ -70,6 +73,6 @@ export async function longCommand<T>(fn: (actor: Actor) => Promise<T>): Promise<
     return { ok: true, data: await fn(actor) };
   } catch (err) {
     if (err && typeof err === "object" && "digest" in err) throw err;
-    return toActionError(err);
+    return translateActionResult(toActionError(err), await getUiLocale());
   }
 }

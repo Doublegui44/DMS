@@ -7,8 +7,9 @@ import { getPartFormData, listObsoleteStock } from "@/modules/parts";
 import { DataTable, type Row } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
 import { fmtQty, pmpCents } from "../../format";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Obsolete stock" };
+export const generateMetadata = pageTitle("obsoleteStock");
 
 export default async function ObsoleteStockPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;

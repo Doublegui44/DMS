@@ -7,8 +7,9 @@ import { PageHeader, Section } from "@/components/shared/page-header";
 import { SpecForm } from "@/components/shared/spec-form";
 import { updateLabourOperationAction } from "../../actions";
 import { operationFields } from "../fields";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Labour operation" };
+export const generateMetadata = pageTitle("labourOperation");
 
 export default async function OperationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

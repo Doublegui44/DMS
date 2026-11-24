@@ -9,14 +9,16 @@ import { inputClass } from "@/components/shared/form";
 import { checkInAction } from "../../actions";
 import { clock, vehicleName } from "../../format";
 import { CheckInForm } from "./check-in-form";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Check-in" };
+export const generateMetadata = pageTitle("checkIn");
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? null;
 
 export default async function CheckInPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
   const t = await getTranslations("workshop");
+  const tu = await getTranslations("ui");
   const internal = one(sp.kind) === "INTERNAL";
   const q = one(sp.q) ?? "";
   const form = await query((ctx) => getCheckInFormData(ctx, { appointmentId: one(sp.appointment), vehicleId: one(sp.vehicle), siteId: one(sp.site) }), {
@@ -62,6 +64,7 @@ export default async function CheckInPage({ searchParams }: { searchParams: Prom
               clear: t("clear"),
               submit: t("openRo"),
               customer: t("customer"),
+              damagesPlaceholder: tu("damagesPlaceholder"),
             }}
           />
         </Section>

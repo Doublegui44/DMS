@@ -1,3 +1,4 @@
+import { formatKm } from "@/lib/format-locale";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { CheckCircle2, Pencil, Undo2 } from "lucide-react";
@@ -185,7 +186,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
                   { label: "VIN", value: <span className="font-mono text-xs">{q.tradeIn.vin}</span> },
                   { label: t("registration"), value: q.tradeIn.registration },
                   { label: t("firstRegistration"), value: q.tradeIn.firstRegistration ? formatDate(q.tradeIn.firstRegistration) : null },
-                  { label: t("mileage"), value: `${q.tradeIn.mileage.toLocaleString("en-GB")} km` },
+                  { label: t("mileage"), value: formatKm(q.tradeIn.mileage) },
                   { label: t("fuel"), value: t(`fuels.${q.tradeIn.fuel}`) },
                   { label: t("marketValue"), value: formatMoney(q.tradeIn.marketValueCents) },
                   { label: t("estimatedRepair"), value: formatMoney(q.tradeIn.estimatedRepairCents) },

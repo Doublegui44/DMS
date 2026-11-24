@@ -2,8 +2,9 @@ import { getTranslations } from "next-intl/server";
 import { query } from "@/lib/session";
 import { PageHeader, Section } from "@/components/shared/page-header";
 import { AccountForm } from "../account-form";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "New account" };
+export const generateMetadata = pageTitle("newAccount");
 
 export default async function NewAccountPage() {
   const t = await getTranslations("accounting");

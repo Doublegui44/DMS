@@ -1,3 +1,4 @@
+import { formatKm } from "@/lib/format-locale";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Factory, Pencil } from "lucide-react";
@@ -80,7 +81,7 @@ export default async function VehiclePage({ params }: { params: Promise<{ id: st
                 { label: tv("brand"), value: v.brand?.name ?? `${v.make} (non-franchise)` },
                 { label: tv("fuel"), value: tv(`fuels.${v.fuel}`) },
                 { label: tv("firstRegistration"), value: v.firstRegistration ? formatDate(v.firstRegistration) : null },
-                { label: tv("mileage"), value: `${v.mileage.toLocaleString("en-GB")} km` },
+                { label: tv("mileage"), value: formatKm(v.mileage) },
                 { label: tv("co2"), value: v.co2 },
                 { label: tv("power"), value: v.powerHp },
                 { label: tv("colour"), value: v.colour },
@@ -97,7 +98,7 @@ export default async function VehiclePage({ params }: { params: Promise<{ id: st
             />
           </Section>
           {inStock && (
-            <Section title="Stock">
+            <Section title={tv("stockType")}>
               <Fields
                 items={[
                   { label: tv("listPrice"), value: formatMoney(v.listPriceCents) },
@@ -146,7 +147,7 @@ export default async function VehiclePage({ params }: { params: Promise<{ id: st
                           </Link>
                           <div className="text-xs text-muted-foreground">{r.site.code}</div>
                         </td>
-                        <td className="py-1.5 pr-3 tabular-nums">{r.mileageIn.toLocaleString("en-GB")} km</td>
+                        <td className="py-1.5 pr-3 tabular-nums">{formatKm(r.mileageIn)}</td>
                         <td className="py-1.5 pr-3">{r.jobs.map((j) => j.description).join(" · ")}</td>
                         <td className="py-1.5 pr-3 text-right tabular-nums">{formatMoney(r.totalExclVatCents)}</td>
                         <td className="py-1.5">

@@ -12,8 +12,9 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { cancelAppointmentAction } from "../actions";
 import { clock, hours } from "../format";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Workshop planner" };
+export const generateMetadata = pageTitle("workshopPlanner");
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? null;
 

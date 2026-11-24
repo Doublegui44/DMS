@@ -6,8 +6,9 @@ import { getQuote, getQuoteFormData } from "@/modules/sales";
 import { PageHeader } from "@/components/shared/page-header";
 import { QuoteBuilder } from "../../quote-builder";
 import { draftFromQuote, toBuilderData } from "../../draft";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Edit quote" };
+export const generateMetadata = pageTitle("editQuote");
 
 export default async function EditQuotePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

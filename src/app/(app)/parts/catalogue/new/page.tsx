@@ -5,8 +5,9 @@ import { PageHeader, Section } from "@/components/shared/page-header";
 import { SpecForm } from "@/components/shared/spec-form";
 import { createPartAction } from "../../actions";
 import { partFields } from "../part-fields";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "New part" };
+export const generateMetadata = pageTitle("newPart");
 
 export default async function NewPartPage() {
   const t = await getTranslations("parts");

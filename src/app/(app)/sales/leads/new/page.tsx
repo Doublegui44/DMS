@@ -4,8 +4,9 @@ import { getLeadFormData, LEAD_SOURCES } from "@/modules/sales";
 import { PageHeader, Section } from "@/components/shared/page-header";
 import { SpecForm } from "@/components/shared/spec-form";
 import { createLeadAction } from "../../actions";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "New lead" };
+export const generateMetadata = pageTitle("newLead");
 
 export default async function NewLeadPage({ searchParams }: { searchParams: Promise<{ customer?: string; interest?: string }> }) {
   const sp = await searchParams;

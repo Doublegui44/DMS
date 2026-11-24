@@ -6,8 +6,9 @@ import { PageHeader, Section } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { JobPanel } from "./job-panel";
 import { RunForm } from "./run-form";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Simulation" };
+export const generateMetadata = pageTitle("simulation");
 
 const steps = (counts: Record<string, number>) => Object.entries(counts).reduce((t, [k, n]) => (k === "day" ? t : t + n), 0);
 

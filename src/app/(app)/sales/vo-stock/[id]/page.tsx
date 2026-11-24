@@ -1,3 +1,4 @@
+import { formatKm } from "@/lib/format-locale";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Wrench } from "lucide-react";
@@ -167,7 +168,7 @@ export default async function VoVehiclePage({ params }: { params: Promise<{ id: 
               items={[
                 { label: t("site"), value: v.site?.name ?? null },
                 { label: t("firstRegistration"), value: v.firstRegistration ? formatDate(v.firstRegistration) : null },
-                { label: t("mileage"), value: v.mileage !== null ? `${v.mileage.toLocaleString("en-GB")} km` : null },
+                { label: t("mileage"), value: v.mileage !== null ? formatKm(v.mileage) : null },
                 { label: t("fuel"), value: t(`fuels.${v.fuel}`) },
                 { label: t("colour"), value: v.colour },
                 { label: "CO₂", value: v.co2 !== null ? `${v.co2} g/km` : null },

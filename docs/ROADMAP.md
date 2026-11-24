@@ -113,10 +113,9 @@ Each phase ends with: migrations applied, seed updated, tests green, app running
 - [x] Long runs in the background from the admin screen, with progress and Stop (D-079)
 - **Done when:** a 30-day run exercises every desk and every flow above, and the invariants still hold ✔ (`tests/integration/simulation.test.ts`, 10 runs in a row with no refused step)
 
-## Phase 10 — Translations and integrations
-- [ ] French translation (then Spanish)
-- [ ] Interactive VO market price feed, OEM order portal mock
-- [ ] Multi-currency (only if demos need it)
+## Phase 10 — Translations and integrations ✅
+- [x] French translation with a language switcher (top bar and login page), dates and amounts in the user's language, server error messages translated (D-081, D-082)
+- [x] Interactive VO market price feed (trade-in in the quote builder, VO purchase) and OEM order portal mock (D-083, D-084)
 - **Done when:** the app runs fully in French with a language switcher
 
 ## Phase 11 — Demo readiness
@@ -125,4 +124,5 @@ Each phase ends with: migrations applied, seed updated, tests green, app running
 - **Done when:** someone new can run the demo from the README alone
 
 ## Later (not scheduled)
-- Nothing yet: the former items moved to Phase 10.
+- Spanish translation (add `messages/es.json` and `messages/server/es.json`; the i18n unit test checks the keys).
+- Multi-currency, only if demos need it.

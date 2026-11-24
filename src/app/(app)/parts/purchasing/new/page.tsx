@@ -4,8 +4,9 @@ import { getPurchaseOrderFormData } from "@/modules/parts";
 import { PageHeader, Section } from "@/components/shared/page-header";
 import { SpecForm } from "@/components/shared/spec-form";
 import { createPurchaseOrderAction } from "../../actions";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "New purchase order" };
+export const generateMetadata = pageTitle("newPurchaseOrder");
 
 export default async function NewPurchaseOrderPage() {
   const t = await getTranslations("parts");

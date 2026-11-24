@@ -24,7 +24,7 @@ A web DMS simulator for a French multi-site, multi-brand dealer group: VN/VO sal
 | Validation | Zod v3, schemas shared by forms, server actions and services |
 | DB | PostgreSQL 17 (local Homebrew instance) via Prisma 6 |
 | Auth | Auth.js v5 (credentials provider, JWT sessions, bcrypt hashes) |
-| i18n | next-intl (messages in `messages/en.json`; `fr`, `es` added later) |
+| i18n | next-intl, locale from the `dms_locale` cookie (no URL prefix): `messages/{en,fr}.json`, server messages in `messages/server/fr.json` (D-081, D-082) |
 | PDF | `@react-pdf/renderer`, rendered in route handlers |
 | Seed / simulation data | `@faker-js/faker` with `fr` locale, deterministic seed |
 | Money | integer cents + a small `money` lib (no floats); `decimal.js` only for PMP unit cost |

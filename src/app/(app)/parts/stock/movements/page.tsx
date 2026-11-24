@@ -7,8 +7,9 @@ import { DataTable, type Row } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
 import { fmtQty, pmpCents } from "../../format";
 import { sourceHref } from "../source-link";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Parts movements" };
+export const generateMetadata = pageTitle("partsMovements");
 
 const KINDS = ["OPENING", "RECEIPT", "COUNTER_SALE", "TRANSFER_OUT", "TRANSFER_IN", "ADJUSTMENT", "ISSUE_RO"] as const;
 

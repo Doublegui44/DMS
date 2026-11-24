@@ -4,8 +4,9 @@ import { getCounterFormData } from "@/modules/parts";
 import { PageHeader, Section } from "@/components/shared/page-header";
 import { SpecForm } from "@/components/shared/spec-form";
 import { createCounterSaleAction } from "../../actions";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "New counter sale" };
+export const generateMetadata = pageTitle("newCounterSale");
 
 export default async function NewCounterSalePage() {
   const t = await getTranslations("parts");

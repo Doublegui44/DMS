@@ -5,8 +5,9 @@ import { parseListParams, type SearchParams } from "@/lib/list";
 import { listOrders } from "@/modules/sales";
 import { DataTable, type Row } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Sales orders" };
+export const generateMetadata = pageTitle("salesOrders");
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;

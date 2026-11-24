@@ -9,8 +9,9 @@ import { DataTable, type Row } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { fmtQty } from "../format";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Parts catalogue" };
+export const generateMetadata = pageTitle("partsCatalogue");
 
 export default async function PartsCataloguePage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;

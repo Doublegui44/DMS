@@ -8,10 +8,12 @@ import { AlertTriangle, Car, Factory, Loader2, Plus, Trash2 } from "lucide-react
 import { Button } from "@/components/ui/button";
 import { Field, inputClass, NativeSelect } from "@/components/shared/form";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { formatKm } from "@/lib/format-locale";
 import { formatBp, formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import type { QuoteInput, QuotePreview } from "@/modules/sales";
 import { previewQuoteAction, saveQuoteAction } from "../actions";
+import { MarketValuation } from "../market-valuation";
 import { centsToInput, FUELS, type BuilderData, type Fuel, type FinancingDraft, type QuoteDraft, type TradeInDraft } from "./draft";
 
 const num = (s: string) => (s.trim() === "" ? Number.NaN : Number(s.replace(/[\s  ]/g, "").replace(",", ".")));
@@ -257,7 +259,7 @@ export function QuoteBuilder({ data, quoteId, initial, canSend }: { data: Builde
                   </div>
                   <div>
                     <div className="text-xs text-muted-foreground">{t("mileage")}</div>
-                    <div className="tabular-nums">{stockVehicle.mileage === null ? "—" : `${stockVehicle.mileage.toLocaleString("en-GB")} km`}</div>
+                    <div className="tabular-nums">{stockVehicle.mileage === null ? "—" : formatKm(stockVehicle.mileage)}</div>
                   </div>
                   <div>
                     <div className="text-xs text-muted-foreground">{t("vatRegime")}</div>
@@ -490,6 +492,11 @@ export function QuoteBuilder({ data, quoteId, initial, canSend }: { data: Builde
                   <NativeSelect name="tradeIn.fuel" value={draft.tradeIn.fuel} onChange={(e) => setTradeIn({ fuel: e.target.value as Fuel })} options={FUELS.map((f) => ({ value: f, label: t(`fuels.${f}`) }))} />
                 </Field>
               </div>
+              <MarketValuation
+                testId="tradein-market-feed"
+                query={() => ({ make: draft.tradeIn!.make, model: draft.tradeIn!.model, firstRegistration: draft.tradeIn!.firstRegistration, mileage: draft.tradeIn!.mileage, fuel: draft.tradeIn!.fuel })}
+                onUse={(cents) => setTradeIn({ marketValue: centsToInput(cents) })}
+              />
               <div className="grid gap-3 border-t pt-3 sm:grid-cols-3">
                 {(
                   [

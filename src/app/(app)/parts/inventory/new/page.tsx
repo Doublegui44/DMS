@@ -4,8 +4,9 @@ import { getCycleCountFormData } from "@/modules/parts";
 import { PageHeader, Section } from "@/components/shared/page-header";
 import { SpecForm } from "@/components/shared/spec-form";
 import { createCycleCountAction } from "../../actions";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "New cycle count" };
+export const generateMetadata = pageTitle("newCycleCount");
 
 export default async function NewCycleCountPage() {
   const t = await getTranslations("parts");

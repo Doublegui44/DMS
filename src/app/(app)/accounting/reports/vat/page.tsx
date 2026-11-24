@@ -7,8 +7,9 @@ import { PageHeader, Section } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { ReportFilters } from "../filters";
 import { periodFrom } from "../params";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "VAT return" };
+export const generateMetadata = pageTitle("vatReturn");
 
 export default async function VatPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = await searchParams;

@@ -19,6 +19,7 @@ interface ContactRow {
 export function ContactsPanel({ customerId, contacts, canEdit }: { customerId: string; contacts: ContactRow[]; canEdit: boolean }) {
   const t = useTranslations("customer");
   const tc = useTranslations("common");
+  const tu = useTranslations("ui");
   const [adding, setAdding] = useState(false);
   const [pending, start] = useTransition();
 
@@ -29,7 +30,7 @@ export function ContactsPanel({ customerId, contacts, canEdit }: { customerId: s
         {contacts.map((c) => (
           <li key={c.id} className="flex items-center gap-3 py-1.5">
             <span className="flex min-w-0 flex-1 items-center gap-1.5 font-medium">
-              {c.isPrimary && <Star className="size-3.5 fill-amber-400 text-amber-500" aria-label="Primary" />}
+              {c.isPrimary && <Star className="size-3.5 fill-amber-400 text-amber-500" aria-label={tu("primaryContact")} />}
               {c.name}
               {c.role && <span className="font-normal text-muted-foreground">· {c.role}</span>}
             </span>
@@ -54,7 +55,7 @@ export function ContactsPanel({ customerId, contacts, canEdit }: { customerId: s
           <ActionForm
             action={addContactAction.bind(null, customerId)}
             submitLabel={t("addContact")}
-            successMessage="Contact added"
+            successMessage={tu("contactAdded")}
             className="rounded-md border p-3"
           >
             {(e) => (
@@ -65,7 +66,7 @@ export function ContactsPanel({ customerId, contacts, canEdit }: { customerId: s
                 <Field label={t("lastName")} name="lastName" error={e.lastName}>
                   <TextInput name="lastName" invalid={!!e.lastName} />
                 </Field>
-                <Field label="Role" name="role">
+                <Field label={tu("contactRole")} name="role">
                   <TextInput name="role" />
                 </Field>
                 <Field label={t("email")} name="email">

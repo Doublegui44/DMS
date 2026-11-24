@@ -9,8 +9,9 @@ import { listEntries, listJournals, listPeriods, periodLabel } from "@/modules/a
 import { DataTable, type Row } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Journal entries" };
+export const generateMetadata = pageTitle("journalEntries");
 
 export default async function EntriesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const p = parseListParams(await searchParams, { sort: "entryDate", dir: "desc" });

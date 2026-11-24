@@ -3,8 +3,9 @@ import { getRequestContext, query } from "@/lib/session";
 import { PageHeader } from "@/components/shared/page-header";
 import { saveCustomerAction } from "../actions";
 import { CustomerForm } from "../customer-form";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "New customer" };
+export const generateMetadata = pageTitle("newCustomer");
 
 export default async function NewCustomerPage() {
   const t = await getTranslations();

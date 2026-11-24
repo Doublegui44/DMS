@@ -9,8 +9,9 @@ import { listPayments } from "@/modules/accounting";
 import { DataTable, type Row } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Payments" };
+export const generateMetadata = pageTitle("payments");
 
 export default async function PaymentsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const p = parseListParams(await searchParams, { sort: "businessDate", dir: "desc" });

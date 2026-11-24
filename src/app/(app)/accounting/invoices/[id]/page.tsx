@@ -17,6 +17,7 @@ import { CreditForm } from "./credit-form";
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const t = await getTranslations("accounting");
+  const tu = await getTranslations("ui");
   const { actor } = await getRequestContext();
   const inv = await query((ctx) => getInvoice(ctx, id));
   const today = await query(async (ctx) => ctx.businessDate);
@@ -45,9 +46,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         actions={
           <>
             {!isDraft && <PdfButton kind="invoice" id={inv.id} />}
-            {isDraft && canValidate && <ActionButton action={issueInvoiceAction.bind(null, inv.id)} label={t("issue")} successMessage="Invoice issued" />}
+            {isDraft && canValidate && <ActionButton action={issueInvoiceAction.bind(null, inv.id)} label={t("issue")} successMessage={tu("invoiceIssued")} />}
             {isDraft && canCreate && (
-              <ActionButton action={deleteDraftInvoiceAction.bind(null, inv.id)} label={t("deleteDraft")} variant="outline" confirm="Delete this draft?" />
+              <ActionButton action={deleteDraftInvoiceAction.bind(null, inv.id)} label={t("deleteDraft")} variant="outline" confirm={tu("deleteDraftConfirm")} />
             )}
             {!isDraft && inv.kind === "INVOICE" && due > 0 && canPay && (
               <Button asChild size="sm" variant="outline">

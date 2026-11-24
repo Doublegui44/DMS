@@ -1,3 +1,4 @@
+import { formatKm } from "@/lib/format-locale";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Check, FileText, Receipt } from "lucide-react";
@@ -242,7 +243,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                 { label: "VIN", value: <span className="font-mono text-xs">{v.vin}</span> },
                 { label: t("registration"), value: v.registration },
                 { label: t("vehicleStatus"), value: <StatusBadge status={v.status} label={t(`vehicleStatuses.${v.status}`)} /> },
-                ...(o.deliveryMileage !== null ? [{ label: t("mileageAtDelivery"), value: `${o.deliveryMileage.toLocaleString("en-GB")} km` }] : []),
+                ...(o.deliveryMileage !== null ? [{ label: t("mileageAtDelivery"), value: formatKm(o.deliveryMileage) }] : []),
               ]}
             />
           </Section>

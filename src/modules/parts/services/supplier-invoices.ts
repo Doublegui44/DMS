@@ -201,7 +201,7 @@ export async function paySupplierInvoice(ctx: ServiceContext, id: string, input:
     action: "supplier_invoice.pay",
     entityType: "SupplierInvoice",
     entityId: id,
-    after: { payment: payment.number, amount: formatMoney(inv.totalInclVatCents), method: data.method },
+    after: { payment: payment.number, amount: formatMoney(inv.totalInclVatCents, { locale: "en-GB" }), method: data.method },
     siteId: inv.siteId,
   });
   return saved;

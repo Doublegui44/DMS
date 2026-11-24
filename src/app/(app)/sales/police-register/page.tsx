@@ -5,8 +5,9 @@ import { parseListParams, type SearchParams } from "@/lib/list";
 import { listPoliceRegister } from "@/modules/sales";
 import { DataTable, type Row } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Police register" };
+export const generateMetadata = pageTitle("policeRegister");
 
 export default async function PoliceRegisterPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;

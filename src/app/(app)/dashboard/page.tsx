@@ -7,11 +7,11 @@ import { getPartsDashboard } from "@/modules/parts";
 import { getWorkshopDashboard } from "@/modules/workshop";
 import { getRoleDashboard } from "@/modules/reports";
 import { RoleWidgets } from "./role-widgets";
-import { ROLE_LABELS, type RoleKey } from "@/modules/admin";
 import { PageHeader, Section } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Dashboard" };
+export const generateMetadata = pageTitle("dashboard");
 
 function Kpi({ label, value, sub, tone }: { label: string; value: string | number; sub?: string; tone?: "warn" }) {
   return (
@@ -27,6 +27,8 @@ function Kpi({ label, value, sub, tone }: { label: string; value: string | numbe
 
 export default async function DashboardPage() {
   const t = await getTranslations("dashboard");
+  const tRole = await getTranslations("roles");
+  const tu = await getTranslations("ui");
   const { actor } = await getRequestContext();
   const firstName = actor.name.split(" ")[0];
   const showStock = actor.permissions.has("vehicle:view");
@@ -41,7 +43,7 @@ export default async function DashboardPage() {
       <PageHeader
         title={t("welcome", { name: firstName })}
         badges={actor.roleKeys.map((k) => (
-          <StatusBadge key={k} status={k} tone="indigo" label={ROLE_LABELS[k as RoleKey] ?? k} />
+          <StatusBadge key={k} status={k} tone="indigo" label={tRole.has(k) ? tRole(k) : k} />
         ))}
         subtitle={t("subtitle")}
       />
@@ -103,11 +105,11 @@ export default async function DashboardPage() {
           <table className="w-full text-[13px]">
             <thead className="text-xs text-muted-foreground">
               <tr className="border-b">
-                <th className="py-1.5 text-left font-medium">Site</th>
+                <th className="py-1.5 text-left font-medium">{t("site")}</th>
                 <th className="py-1.5 text-right font-medium">VN</th>
-                <th className="py-1.5 text-right font-medium">VN value</th>
+                <th className="py-1.5 text-right font-medium">{tu("vnValue")}</th>
                 <th className="py-1.5 text-right font-medium">VO</th>
-                <th className="py-1.5 text-right font-medium">VO value</th>
+                <th className="py-1.5 text-right font-medium">{tu("voValue")}</th>
                 <th className="py-1.5 text-right font-medium">{t("stockValue")}</th>
               </tr>
             </thead>

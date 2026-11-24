@@ -4,8 +4,9 @@ import { formatBp, formatMoney, inclFromExcl, ratioBp } from "@/lib/money";
 import { getCatalogue } from "@/modules/sales";
 import { PageHeader, Section } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Catalogue" };
+export const generateMetadata = pageTitle("catalogue");
 
 export default async function CataloguePage() {
   const t = await getTranslations("sales");

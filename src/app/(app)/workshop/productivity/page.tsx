@@ -8,8 +8,9 @@ import { PageHeader, Section } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { inputClass } from "@/components/shared/form";
 import { hours } from "../format";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Productivity" };
+export const generateMetadata = pageTitle("productivity");
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? null;
 

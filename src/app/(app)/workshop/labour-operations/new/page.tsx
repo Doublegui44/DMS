@@ -6,8 +6,9 @@ import { PageHeader, Section } from "@/components/shared/page-header";
 import { SpecForm } from "@/components/shared/spec-form";
 import { createLabourOperationAction } from "../../actions";
 import { operationFields } from "../fields";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "New labour operation" };
+export const generateMetadata = pageTitle("newLabourOperation");
 
 export default async function NewOperationPage() {
   const t = await getTranslations("workshop");

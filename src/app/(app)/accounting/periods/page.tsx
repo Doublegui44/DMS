@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
+import { getUiLocale } from "@/i18n/current";
+import { translateServerMessage } from "@/i18n/server-messages";
 import { CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
 import { getRequestContext, query } from "@/lib/session";
 import { can } from "@/lib/rbac";
@@ -11,8 +13,9 @@ import { ActionButton } from "@/components/shared/action-button";
 import { cn } from "@/lib/utils";
 import { lockPeriodAction } from "../actions";
 import { ReopenForm } from "./reopen-form";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Fiscal periods" };
+export const generateMetadata = pageTitle("fiscalPeriods");
 
 /** The reports an accountant reviews before locking a month. */
 function closePack(p: { year: number; month: number; startDate: Date; endDate: Date }) {
@@ -30,11 +33,13 @@ function closePack(p: { year: number; month: number; startDate: Date; endDate: D
 export default async function PeriodsPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
   const sp = await searchParams;
   const t = await getTranslations("accounting");
+  const tu = await getTranslations("ui");
   const { actor } = await getRequestContext();
   const periods = await query((ctx) => listPeriods(ctx), { resource: "accounting.period", action: "view" });
   // Default selection: the earliest open period that has ended.
   const selectedId = sp.period ?? [...periods].reverse().find((p) => p.status === "OPEN" && p.entryCount > 0)?.id;
   const selected = periods.find((p) => p.id === selectedId);
+  const locale = await getUiLocale();
   const checklist = selected ? await query((ctx) => getPeriodChecklist(ctx, selected.id)) : null;
 
   return (
@@ -85,7 +90,7 @@ export default async function PeriodsPage({ searchParams }: { searchParams: Prom
                       <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" />
                     )}
                     <span>
-                      {c.message}
+                      {translateServerMessage(c.message, locale)}
                       {!c.ok && <span className="ml-1 text-xs text-muted-foreground">({c.blocking ? t("blocking") : t("warning")})</span>}
                     </span>
                   </li>
@@ -108,7 +113,7 @@ export default async function PeriodsPage({ searchParams }: { searchParams: Prom
                 <ActionButton
                   action={lockPeriodAction.bind(null, selected.id)}
                   label={t("lock")}
-                  successMessage="Period locked"
+                  successMessage={tu("periodLocked")}
                   confirm={`Lock ${periodLabel(selected)}? No entry can be posted in it afterwards.`}
                 />
               )}

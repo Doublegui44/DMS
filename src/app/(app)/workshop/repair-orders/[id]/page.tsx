@@ -1,3 +1,4 @@
+import { formatKm } from "@/lib/format-locale";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Check, CircleCheck, RotateCcw, X } from "lucide-react";
@@ -30,8 +31,9 @@ import {
   reopenJobAction,
 } from "../../actions";
 import { clock, hours, vehicleName } from "../../format";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Repair order" };
+export const generateMetadata = pageTitle("repairOrder");
 
 const qtyText = (q: { toString(): string }) => String(Number(q.toString()));
 
@@ -405,7 +407,7 @@ export default async function RepairOrderPage({ params }: { params: Promise<{ id
           <Section title={t("checkInRecord")}>
             <Fields
               items={[
-                { label: t("mileageIn"), value: `${ro.mileageIn.toLocaleString("en-GB")} km` },
+                { label: t("mileageIn"), value: formatKm(ro.mileageIn) },
                 { label: t("fuelLevel"), value: `${ro.fuelLevelPct} %` },
                 { label: t("damages"), value: damages.length ? damages.map((x) => `${x.zone}${x.note ? `: ${x.note}` : ""}`).join(" · ") : t("noDamage") },
                 { label: t("signedBy"), value: ro.signedBy },

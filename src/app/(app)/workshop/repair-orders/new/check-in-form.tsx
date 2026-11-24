@@ -19,6 +19,7 @@ export interface CheckInLabels {
   clear: string;
   submit: string;
   customer: string;
+  damagesPlaceholder: string;
 }
 
 /** Signature drawn with the mouse or a finger; sent as a PNG data URL in a hidden input. */
@@ -120,7 +121,7 @@ export function CheckInForm({
             <TextInput name="concern" defaultValue={defaults.concern} data-testid="checkin-concern" />
           </Field>
           <Field label={labels.damages} name="damages" error={errors.damages} className="sm:col-span-full">
-            <textarea id="damages" name="damages" rows={2} className={cn(inputClass, "h-auto py-1.5")} placeholder="FRONT: scratch on bumper" data-testid="checkin-damages" />
+            <textarea id="damages" name="damages" rows={2} className={cn(inputClass, "h-auto py-1.5")} placeholder={labels.damagesPlaceholder} data-testid="checkin-damages" />
             <p className="text-[11px] text-muted-foreground">{labels.damagesHint}</p>
           </Field>
           <Field label={labels.promisedOn} name="promisedOn" error={errors.promisedOn}>

@@ -6,8 +6,9 @@ import { PageHeader } from "@/components/shared/page-header";
 import { saveVehicleAction } from "../../actions";
 import { VehicleForm } from "../../vehicle-form";
 import { vehicleFormOptions } from "../../form-data";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Edit vehicle" };
+export const generateMetadata = pageTitle("editVehicle");
 
 const euros = (cents: number | null) => (cents === null ? "" : (cents / 100).toFixed(2).replace(".", ","));
 

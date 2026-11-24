@@ -5,8 +5,9 @@ import { PageHeader, Section } from "@/components/shared/page-header";
 import { SpecForm } from "@/components/shared/spec-form";
 import { updatePartAction } from "../../../actions";
 import { partFields } from "../../part-fields";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Edit part" };
+export const generateMetadata = pageTitle("editPart");
 
 export default async function EditPartPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

@@ -1,3 +1,4 @@
+import { formatKm } from "@/lib/format-locale";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Pencil } from "lucide-react";
@@ -102,7 +103,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                     </Link>
                     <span className="flex items-center gap-3 text-muted-foreground">
                       <span className="font-mono text-xs">{v.registration ?? v.vin}</span>
-                      <span className="tabular-nums">{v.mileage.toLocaleString("en-GB")} km</span>
+                      <span className="tabular-nums">{formatKm(v.mileage)}</span>
                     </span>
                   </li>
                 ))}

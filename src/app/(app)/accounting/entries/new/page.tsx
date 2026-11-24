@@ -4,8 +4,9 @@ import { isoDate } from "@/lib/dates";
 import { listJournals, listPartyOptions, listPostableAccounts } from "@/modules/accounting";
 import { PageHeader, Section } from "@/components/shared/page-header";
 import { EntryForm } from "./entry-form";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "New journal entry" };
+export const generateMetadata = pageTitle("newJournalEntry");
 
 export default async function NewEntryPage() {
   const t = await getTranslations("accounting");

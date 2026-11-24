@@ -6,8 +6,9 @@ import { listPartyBalances } from "@/modules/accounting";
 import { DataTable, type Row } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
 import { cn } from "@/lib/utils";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Ledgers" };
+export const generateMetadata = pageTitle("ledgers");
 
 export default async function LedgersPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;

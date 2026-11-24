@@ -5,7 +5,8 @@ import { applyRate, inclFromExcl, sumCents } from "@/lib/money";
 import { parseInput } from "@/lib/validation";
 import { buildPurchaseEntry, postEntry } from "@/modules/accounting";
 import { changeVehicleStatus, moveVehicleStock, nextDocumentNumber, patchVehicle } from "@/modules/core";
-import { receiveVehicleSchema, stockOrderInputSchema, type ReceiveVehicleInput, type StockOrderInput } from "../schemas/sales";
+import { addDays } from "@/lib/dates";
+import { factoryDelayInputSchema, receiveVehicleSchema, stockOrderInputSchema, type FactoryDelayInput, type ReceiveVehicleInput, type StockOrderInput } from "../schemas/sales";
 import { oemReference, placeFactoryOrder } from "./orders";
 import { catalogueVersionFor, standardRateBp, vehicleLabel } from "./shared";
 
@@ -47,6 +48,25 @@ export async function shipFactoryOrder(ctx: ServiceContext, factoryOrderId: stri
   // A vehicle sold to a customer stays RESERVED; a stock vehicle shows as in transit.
   if (fo.vehicle.status === "ORDERED") await changeVehicleStatus(ctx, fo.vehicleId, "IN_TRANSIT", `Shipped — ${fo.number}`, { trusted: true });
   await ctx.audit({ action: "factory_order.ship", entityType: "Vehicle", entityId: fo.vehicleId, siteId: fo.siteId, after: { number: fo.number } });
+  return updated;
+}
+
+/**
+ * The manufacturer pushes a factory order back (OEM portal mock, D-084): the promised date moves,
+ * and so does the delivery date promised to the customer when the car is already sold.
+ */
+export async function delayFactoryOrder(ctx: ServiceContext, factoryOrderId: string, input: FactoryDelayInput) {
+  const data = parseInput(factoryDelayInputSchema, input);
+  const fo = await ctx.tx.factoryOrder.findUnique({ where: { id: factoryOrderId }, include: { salesOrder: { select: { id: true, expectedDeliveryDate: true } } } });
+  if (!fo) throw new NotFoundError("FactoryOrder", factoryOrderId);
+  ctx.require("sales.vn_stock", "edit", fo.siteId);
+  if (fo.status !== "ORDERED" && fo.status !== "IN_TRANSIT") throw new ConflictError(`Factory order ${fo.number} is ${fo.status.toLowerCase().replace("_", " ")}`);
+  const expectedOn = addDays(fo.expectedOn, data.days);
+  const updated = await ctx.tx.factoryOrder.update({ where: { id: fo.id }, data: { expectedOn } });
+  if (fo.salesOrder?.expectedDeliveryDate) {
+    await ctx.tx.salesOrder.update({ where: { id: fo.salesOrder.id }, data: { expectedDeliveryDate: addDays(fo.salesOrder.expectedDeliveryDate, data.days) } });
+  }
+  await ctx.audit({ action: "factory_order.delay", entityType: "Vehicle", entityId: fo.vehicleId, siteId: fo.siteId, before: { expectedOn: fo.expectedOn }, after: { expectedOn, days: data.days, reason: data.reason } });
   return updated;
 }
 

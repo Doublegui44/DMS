@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { ShieldAlert } from "lucide-react";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Access denied" };
+export const generateMetadata = pageTitle("accessDenied");
 
 export default async function ForbiddenPage() {
   const t = await getTranslations();

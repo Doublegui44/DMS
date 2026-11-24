@@ -6,11 +6,12 @@ import { reverseEntryAction } from "../../actions";
 
 export function ReverseForm({ entryId }: { entryId: string }) {
   const t = useTranslations("accounting");
+  const tu = useTranslations("ui");
   return (
     <ActionForm
       action={reverseEntryAction.bind(null, entryId)}
       submitLabel={t("reverse")}
-      successMessage="Reversal posted"
+      successMessage={tu("reversalPosted")}
       className="flex flex-wrap items-end gap-3 space-y-0 [&>div:last-child]:pt-0"
     >
       {(e) => (

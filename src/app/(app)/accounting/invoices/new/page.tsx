@@ -4,8 +4,9 @@ import { can } from "@/lib/rbac";
 import { listPartyOptions, listVatRates, REVENUE_KEYS } from "@/modules/accounting";
 import { PageHeader, Section } from "@/components/shared/page-header";
 import { InvoiceForm } from "./invoice-form";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "New invoice" };
+export const generateMetadata = pageTitle("newInvoice");
 
 export default async function NewInvoicePage({ searchParams }: { searchParams: Promise<{ customer?: string }> }) {
   const sp = await searchParams;

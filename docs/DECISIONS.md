@@ -328,3 +328,20 @@ An internal RO prepares a used car in stock (INTAKE, RECONDITIONING, FOR_SALE or
 - Parts: emergency orders for parts the site does not stock (`emergencyOrdersPerWeek`), transfers on Thursdays from a site that has stock to the sites below their minimum, a cycle count of one aisle on the first Tuesday of the month, supplier invoices with a price variance (`supplierVarianceRate`: small ones within the tolerance, large ones held in VARIANCE and approved or rejected 1–4 days later).
 - Workshop: insurance jobs with a bodyshop sublet (`insuranceJobRate`); an additional job is approved only if its parts are on the shelf, otherwise declined, so a repair order never waits on parts the runner will not order.
 - Sales: a share of used-car purchases are from private sellers (`privateVoShare`, margin VAT, paid by transfer or cheque).
+
+## D-081 — UI language from a cookie
+- The locale is the `dms_locale` cookie (`en` default, `fr`), not a URL prefix: every link, redirect and e2e path stays as it was. `src/i18n/locales.ts` lists the locales; `getUiLocale()` (React-cached per request) reads the cookie for `src/i18n/request.ts`. The switcher (top bar and login page) calls `setLocale`, which sets the cookie for a year and refreshes the layout.
+- Dates and amounts follow the language (`en-GB` / `fr-FR`): `formatMoney`, `formatDate`, `formatBp`, `formatNumber`, `formatKm` default to `formatLocale()`, set per request on the server and by `<FormatLocale>` in the root layout for client components. Code that writes stored text (audit details, approval comments) passes `"en-GB"` explicitly.
+- Page titles come from the `titles` namespace through `pageTitle(key)`, role names from `roles`, timeline labels from `activity` (event types and audit actions, dots written `__`; unknown codes are spelled out). `tests/unit/i18n.test.ts` checks that `fr.json` has exactly the keys and ICU arguments of `en.json`.
+
+## D-082 — Server messages translated at the action boundary; data stays English
+- Services keep throwing English (CLI, simulator, tests and logs read them). `command()` / `longCommand()` translate the error and field errors of the `ActionResult` with `translateServerMessage`: `messages/server/fr.json` maps English templates (`{}` = any value) to French, longest first; messages joined with " · " are translated part by part; an unknown message stays English. The i18n test extracts every literal message from the services and fails when one has no French entry.
+- Stored and exported data is not translated: journal labels, invoice and quote line texts, seeded names, CSV headers and audit action codes. They are records, and translating them would make the books depend on who looked at them.
+
+## D-083 — VO market price feed (mock)
+- `valueOnMarket` (sales `domain/market.ts`, pure) builds six comparable listings and a trade value from make, model, first registration, mileage and fuel: new price (cheapest catalogue version of the make × 1.2, else €28,000) depreciated by age and mileage, a spread from an FNV hash of make|model|year, so the same car always gets the same answer. Trade value = listings median × 0.85.
+- `getMarketValuation` (needs `sales.trade_in:view`) serves the quote builder's trade-in and the VO purchase form; "use" fills the value field, the user can still change it. Nothing is stored: the price recorded is the one in the form.
+
+## D-084 — OEM order portal (mock)
+- `/sales/oem-portal` shows factory orders as the manufacturer would: the plant stage (received, build slot, in production, built, shipped) is derived from the order date and the promised date (`oemOrderState`, pure), so it moves with the business clock without a new table.
+- The manufacturer can ship a built order (the existing `shipFactoryOrder`) or push the promised date back (`delayFactoryOrder`: 1–90 days and a reason, audited; it also moves the expected delivery date of the customer order). Invoice value = the vehicle's stock value.

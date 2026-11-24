@@ -56,16 +56,17 @@ export function VehicleForm({
 }) {
   const t = useTranslations("vehicle");
   const ts = useTranslations("sales");
+  const tu = useTranslations("ui");
   const stockType = isEdit ? (initial.stockType ?? "NONE") : "NONE";
   const status = isEdit ? (initial.status ?? "CUSTOMER") : "CUSTOMER";
   const stockCar = stockType !== "NONE";
 
   return (
-    <ActionForm action={action} submitLabel={submitLabel} cancelHref={cancelHref} successMessage="Saved">
+    <ActionForm action={action} submitLabel={submitLabel} cancelHref={cancelHref} successMessage={tu("saved")}>
       {(e) => (
         <div className="grid gap-6 lg:grid-cols-2">
           <fieldset className="min-w-0 space-y-3 rounded-lg border bg-card p-4">
-            <legend className="px-1 text-sm font-semibold">Identification</legend>
+            <legend className="px-1 text-sm font-semibold">{tu("identification")}</legend>
             <div className="grid grid-cols-[1fr_160px] gap-3">
               <Field label={t("vin")} name="vin" error={e.vin}>
                 <TextInput name="vin" defaultValue={initial.vin} maxLength={17} className="font-mono" invalid={!!e.vin} />
@@ -79,7 +80,7 @@ export function VehicleForm({
                 <NativeSelect
                   name="brandId"
                   defaultValue={initial.brandId}
-                  placeholder="— (other make)"
+                  placeholder={tu("otherMake")}
                   disabled={stockCar}
                   options={brands.map((b) => ({ value: b.id, label: b.name }))}
                 />

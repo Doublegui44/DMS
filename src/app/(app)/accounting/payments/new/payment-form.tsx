@@ -33,6 +33,7 @@ export function PaymentForm(props: {
   openItems: OpenItem[];
 }) {
   const t = useTranslations("accounting");
+  const tu = useTranslations("ui");
   const router = useRouter();
   const pathname = usePathname();
   const [pending, start] = useTransition();
@@ -72,7 +73,7 @@ export function PaymentForm(props: {
       });
       if (!res) return;
       if (res.ok) {
-        toast.success("Payment recorded");
+        toast.success(tu("paymentRecorded"));
         router.push(res.data.redirectTo!);
       } else toast.error(res.error.message);
     });

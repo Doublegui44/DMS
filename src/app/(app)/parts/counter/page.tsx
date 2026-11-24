@@ -10,8 +10,9 @@ import { listCounterSales } from "@/modules/parts";
 import { DataTable, type Row } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Counter sales" };
+export const generateMetadata = pageTitle("counterSales");
 
 const STATUSES = ["QUOTE", "CONFIRMED", "INVOICED", "CANCELLED"] as const;
 const CLASSES = ["RETAIL", "TRADE", "INTERNAL", "WARRANTY"] as const;

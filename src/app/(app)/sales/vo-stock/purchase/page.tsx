@@ -4,8 +4,10 @@ import { FUELS, getVoFormData } from "@/modules/sales";
 import { PageHeader, Section } from "@/components/shared/page-header";
 import { SpecForm } from "@/components/shared/spec-form";
 import { purchaseVoAction } from "../../actions";
+import { VoMarketPanel } from "./market-panel";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Buy a used car" };
+export const generateMetadata = pageTitle("buyAUsedCar");
 
 export default async function VoPurchasePage() {
   const t = await getTranslations("sales");
@@ -45,6 +47,12 @@ export default async function VoPurchasePage() {
             { name: "vehicle.colour", label: t("colour") },
           ]}
         />
+      </Section>
+      <Section title={t("market.title")} className="mt-4">
+        <div className="space-y-2 p-4">
+          <p className="text-xs text-muted-foreground">{t("market.voHint")}</p>
+          <VoMarketPanel />
+        </div>
       </Section>
     </div>
   );

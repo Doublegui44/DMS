@@ -8,8 +8,9 @@ import { DataTable, type Row } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { hours } from "../format";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Labour catalogue" };
+export const generateMetadata = pageTitle("labourCatalogue");
 
 export default async function LabourOperationsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;

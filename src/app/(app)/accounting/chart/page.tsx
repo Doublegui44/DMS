@@ -8,12 +8,14 @@ import { listAccounts } from "@/modules/accounting";
 import { DataTable, type Row } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Chart of accounts" };
+export const generateMetadata = pageTitle("chartOfAccounts");
 
 export default async function ChartPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const p = parseListParams(await searchParams, { sort: "code", dir: "asc", pageSize: 100 });
   const t = await getTranslations("accounting");
+  const tu = await getTranslations("ui");
   const { actor } = await getRequestContext();
   const data = await query((ctx) => listAccounts(ctx, p), { resource: "accounting.chart", action: "view" });
   const rows: Row[] = data.rows.map((a) => ({
@@ -25,10 +27,10 @@ export default async function ChartPage({ searchParams }: { searchParams: Promis
     flags: {
       kind: "badges",
       items: [
-        ...(a.requiresAnalytic ? [{ status: "analytic", label: "Analytic", tone: "indigo" as const }] : []),
-        ...(a.isReceivable ? [{ status: "receivable", label: "Customer", tone: "blue" as const }] : []),
-        ...(a.isPayable ? [{ status: "payable", label: "Supplier", tone: "amber" as const }] : []),
-        ...(!a.active ? [{ status: "INACTIVE", label: "Inactive" }] : []),
+        ...(a.requiresAnalytic ? [{ status: "analytic", label: tu("analytic"), tone: "indigo" as const }] : []),
+        ...(a.isReceivable ? [{ status: "receivable", label: tu("customerFlag"), tone: "blue" as const }] : []),
+        ...(a.isPayable ? [{ status: "payable", label: tu("supplierFlag"), tone: "amber" as const }] : []),
+        ...(!a.active ? [{ status: "INACTIVE", label: tu("inactive") }] : []),
       ],
     },
     balance: { kind: "money", cents: a.balanceCents },

@@ -1,3 +1,5 @@
+import { formatLocale } from "./format-locale";
+
 /** Date-only helpers. Business dates are stored as UTC midnight (`@db.Date`). */
 
 export function toDateOnly(d: Date | string): Date {
@@ -26,13 +28,13 @@ export function isoDate(d: Date | null | undefined): string {
   return toDateOnly(d).toISOString().slice(0, 10);
 }
 
-export function formatDate(d: Date | string | null | undefined, locale = "en-GB"): string {
+export function formatDate(d: Date | string | null | undefined, locale = formatLocale()): string {
   if (!d) return "—";
   const date = typeof d === "string" ? new Date(d) : d;
   return new Intl.DateTimeFormat(locale, { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }).format(date);
 }
 
-export function formatDateTime(d: Date | string | null | undefined, locale = "en-GB"): string {
+export function formatDateTime(d: Date | string | null | undefined, locale = formatLocale()): string {
   if (!d) return "—";
   const date = typeof d === "string" ? new Date(d) : d;
   return new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" }).format(date);

@@ -4,8 +4,9 @@ import { isoDate } from "@/lib/dates";
 import { listOpenItems, listPartyOptions } from "@/modules/accounting";
 import { PageHeader, Section } from "@/components/shared/page-header";
 import { PaymentForm } from "./payment-form";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "New payment" };
+export const generateMetadata = pageTitle("newPayment");
 
 export default async function NewPaymentPage({ searchParams }: { searchParams: Promise<{ customer?: string; invoice?: string; site?: string }> }) {
   const sp = await searchParams;

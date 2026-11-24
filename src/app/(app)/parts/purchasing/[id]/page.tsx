@@ -13,8 +13,9 @@ import { ActionButton } from "@/components/shared/action-button";
 import { TableForm } from "../../table-form";
 import { addPurchaseLineAction, cancelPurchaseOrderAction, closePurchaseOrderAction, receivePurchaseOrderAction, removePurchaseLineAction, sendPurchaseOrderAction } from "../../actions";
 import { fmtQty, qtyInput } from "../../format";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Purchase order" };
+export const generateMetadata = pageTitle("purchaseOrder");
 
 export default async function PurchaseOrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

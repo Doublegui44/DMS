@@ -7,8 +7,9 @@ import { PageHeader, Section } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { inputClass } from "@/components/shared/form";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Trial balance" };
+export const generateMetadata = pageTitle("trialBalance");
 
 export default async function TrialBalancePage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string; site?: string }> }) {
   const sp = await searchParams;

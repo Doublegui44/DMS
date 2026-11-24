@@ -7,8 +7,9 @@ import { PageHeader, Section } from "@/components/shared/page-header";
 import { SpecForm } from "@/components/shared/spec-form";
 import { Button } from "@/components/ui/button";
 import { orderForStockAction } from "../../actions";
+import { pageTitle } from "@/lib/page-title";
 
-export const metadata = { title: "Order for stock" };
+export const generateMetadata = pageTitle("orderForStock");
 
 /** Two steps without client code: pick the version (GET), then its options and the site. */
 export default async function OrderForStockPage({ searchParams }: { searchParams: Promise<{ version?: string }> }) {
