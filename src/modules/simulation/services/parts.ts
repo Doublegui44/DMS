@@ -90,7 +90,8 @@ async function supplierInvoices(sim: Sim, site: SiteCast) {
         lines: open.map((l, i) => ({
           receiptLineId: l.id,
           qty: String(Number(l.qty) - Number(l.qtyInvoiced)),
-          unitCostCents: variance && i === bumped ? Math.round(l.unitCostCents * factor) : undefined,
+          // At least one cent up: on a cheap part, 0.4 % would round back to the receipt price.
+          unitCostCents: variance && i === bumped ? Math.max(l.unitCostCents + 1, Math.round(l.unitCostCents * factor)) : undefined,
         })),
       }),
     );
