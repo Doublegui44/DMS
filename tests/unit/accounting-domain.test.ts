@@ -22,6 +22,7 @@ import {
 import { canLock, closeChecklist, periodBounds, periodOf } from "@/modules/accounting/domain/periods";
 import { netResult, trialBalance } from "@/modules/accounting/domain/trial-balance";
 import { accountClass, DEFAULT_ACCOUNTS, DEFAULT_MAPPINGS } from "@/modules/accounting/domain/default-chart";
+import { dueSupplierItems } from "@/modules/accounting/domain/payment-run";
 
 const total = (lines: { debitCents: number; creditCents: number }[]) => ({
   d: sumCents(lines.map((l) => l.debitCents)),
@@ -401,5 +402,29 @@ describe("default chart", () => {
   it("uses 6-digit codes and derives the class", () => {
     for (const a of DEFAULT_ACCOUNTS) expect(a.code).toMatch(/^[1-8]\d{5}$/);
     expect(accountClass("706100")).toBe(7);
+  });
+});
+
+describe("supplier payment run (D-078)", () => {
+  const l = (date: string, creditCents: number, debitCents = 0) => ({ date: new Date(date), creditCents, debitCents });
+  const asOf = new Date("2026-03-31");
+
+  it("pays the fully open items whose due date has come, oldest first", () => {
+    const lines = [l("2026-01-10", 1_000), l("2026-02-20", 2_000), l("2026-03-20", 3_000)];
+    expect(dueSupplierItems(lines, 30, asOf)).toEqual([lines[0], lines[1]]);
+    expect(dueSupplierItems(lines, 0, asOf)).toEqual(lines);
+    expect(dueSupplierItems(lines, 60, asOf)).toEqual([lines[0]]);
+    expect(dueSupplierItems(lines, 90, asOf)).toEqual([]);
+  });
+
+  it("leaves items already paid (FIFO) and the partly paid one", () => {
+    // A 1,500 payment settles the oldest item and half of the second.
+    const lines = [l("2026-01-10", 1_000), l("2026-02-20", 1_000), l("2026-02-25", 500), l("2026-03-01", 0, 1_500)];
+    expect(dueSupplierItems(lines, 0, asOf)).toEqual([lines[2]]);
+  });
+
+  it("pays nothing when the supplier is owed nothing", () => {
+    expect(dueSupplierItems([l("2026-01-10", 1_000), l("2026-01-11", 0, 1_000)], 0, asOf)).toEqual([]);
+    expect(dueSupplierItems([], 0, asOf)).toEqual([]);
   });
 });

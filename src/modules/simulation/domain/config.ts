@@ -18,8 +18,10 @@ export const simulationRatesSchema = z.object({
   financingRate: z.coerce.number().min(0).max(1).default(0.45),
   /** Signed orders cancelled within the cooling-off days. */
   cancellationRate: z.coerce.number().min(0).max(1).default(0.03),
-  /** Used cars bought from the trade, per site and per week. */
+  /** Used cars bought, per site and per week (from traders, or from private sellers). */
   voPurchasesPerWeek: z.coerce.number().min(0).max(20).default(1),
+  /** Share of those bought from private sellers (margin VAT scheme, paid at once). */
+  privateVoShare: z.coerce.number().min(0).max(1).default(0.3),
   /** New cars in stock or on order per brand below which a stock order is placed. */
   vnStockTarget: z.coerce.number().int().min(0).max(100).default(18),
   /** Workshop visits (appointments booked ahead plus walk-ins). */
@@ -28,10 +30,16 @@ export const simulationRatesSchema = z.object({
   bookedShare: z.coerce.number().min(0).max(1).default(0.7),
   /** Visits where the technician finds more work to quote. */
   additionalWorkRate: z.coerce.number().min(0).max(1).default(0.15),
+  /** Visits with an insurance job (bodywork sublet to a bodyshop, invoiced to the insurer). */
+  insuranceJobRate: z.coerce.number().min(0).max(1).default(0.04),
   /** Used cars prepared by the workshop, per site and per week. */
   internalRepairsPerWeek: z.coerce.number().min(0).max(20).default(1.6),
   /** Parts counter sales. */
   counterSalesPerDay: z.coerce.number().min(0).max(30).default(1.6),
+  /** Parts orders placed for a customer outside the Monday replenishment, per site and per week. */
+  emergencyOrdersPerWeek: z.coerce.number().min(0).max(20).default(0.5),
+  /** Supplier invoices whose price differs from the receipt (the parts manager approves most, rejects some). */
+  supplierVarianceRate: z.coerce.number().min(0).max(1).default(0.12),
   /** Company invoices paid late (the rest are paid on their due date). */
   latePaymentRate: z.coerce.number().min(0).max(1).default(0.15),
   /** Random seed: the same seed on the same data gives the same run. */

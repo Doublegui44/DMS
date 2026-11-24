@@ -4,12 +4,12 @@ import { useTranslations } from "next-intl";
 import { ActionForm, Field, NativeSelect, TextInput } from "@/components/shared/form";
 import { runSimulationAction } from "./actions";
 
-const SHARES = new Set(["vnShare", "lostEarlyRate", "conversionRate", "tradeInRate", "financingRate", "cancellationRate", "bookedShare", "additionalWorkRate", "latePaymentRate"]);
+const SHARES = new Set(["privateVoShare", "insuranceJobRate", "supplierVarianceRate", "vnShare", "lostEarlyRate", "conversionRate", "tradeInRate", "financingRate", "cancellationRate", "bookedShare", "additionalWorkRate", "latePaymentRate"]);
 
 export function RunForm({ sites, defaults }: { sites: { slug: string; name: string }[]; defaults: Record<string, number> }) {
   const t = useTranslations("simulation");
   return (
-    <ActionForm action={runSimulationAction} submitLabel={t("submit")} successMessage={t("done")}>
+    <ActionForm action={runSimulationAction} submitLabel={t("submit")} successMessage={t("started")}>
       {(e) => (
         <>
           <div className="grid gap-3 sm:grid-cols-2">

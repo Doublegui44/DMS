@@ -35,12 +35,14 @@ export interface SimulationReport {
   invariants: SimulationInvariants;
   /** An unexpected failure that stopped the run (the days before it are kept). */
   error: string | null;
+  /** Stopped on request before all its days (the days before are kept). */
+  stopped: boolean;
   ok: boolean;
 }
 
 declare module "@/lib/events" {
   interface DomainEventMap {
-    SimulationRun: { from: string; to: string; days: number; site: string | null; ok: boolean; counts: Record<string, number>; skippedCount: number; skipped: Skipped[]; invariants: SimulationInvariants; error: string | null; rates: SimulationRates };
+    SimulationRun: { from: string; to: string; days: number; site: string | null; ok: boolean; stopped: boolean; counts: Record<string, number>; skippedCount: number; skipped: Skipped[]; invariants: SimulationInvariants; error: string | null; rates: SimulationRates };
   }
 }
 
@@ -68,7 +70,7 @@ export async function checkSimulationInvariants(): Promise<SimulationInvariants>
  * Decisions about an existing record (accept this quote? pay this invoice late?) are drawn from
  * the record's id and the seed, so the runner keeps no state and can stop and resume anywhere.
  */
-export async function runSimulation(starter: Actor, input: SimulationInput | Record<string, unknown>, opts: { onDay?: (day: Date, counts: Record<string, number>) => void } = {}): Promise<SimulationReport> {
+export async function runSimulation(starter: Actor, input: SimulationInput | Record<string, unknown>, opts: { onDay?: (day: Date, counts: Record<string, number>) => void; shouldStop?: () => boolean } = {}): Promise<SimulationReport> {
   const data = parseInput(simulationInputSchema, input);
   const rates = simulationRatesSchema.parse(data.rates);
   const start = await runQuery({ actor: starter, siteId: null, permission: { resource: "admin.simulation", action: "edit" } }, async (ctx) => ctx.businessDate);
@@ -80,8 +82,13 @@ export async function runSimulation(starter: Actor, input: SimulationInput | Rec
   const stream = rng(`${rates.seed}|${isoDate(start)}`);
   let day = start;
   let error: string | null = null;
+  let stopped = false;
   try {
     for (let i = 0; i < data.days; i++) {
+      if (opts.shouldStop?.()) {
+        stopped = true;
+        break;
+      }
       // The year's periods exist before anything is posted on its first day.
       await runCommand({ actor: starter, siteId: null, businessDate: day }, (ctx) => ensurePeriods(ctx.tx, day, addDays(day, 31)));
       if (isOpenDay(day)) {
@@ -112,6 +119,7 @@ export async function runSimulation(starter: Actor, input: SimulationInput | Rec
     skipped,
     invariants,
     error,
+    stopped,
     ok: !error && invariants.balanced && invariants.stockReconciled,
   };
   await runCommand({ actor: starter, siteId: null, businessDate: day }, async (ctx) => {

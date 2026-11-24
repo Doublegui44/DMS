@@ -8,9 +8,11 @@ import { db, makeActor, resetWithWorkshop, sys } from "./helpers";
 
 /**
  * Phase 7 "done when": 30 simulated days run with no error and the books still hold — the journal
- * balances and every stock account equals its sub-ledger. The org is the workshop test org plus
- * the staff the runner acts through, a few customers with their cars, new and used cars in stock
- * and parts with reorder levels.
+ * balances and every stock account equals its sub-ledger. Phase 9: the same run exercises the
+ * payment run, transfers, cycle counts, emergency orders, supplier price variances, insurance jobs
+ * and private-seller purchases. The org is the workshop test org plus the staff the runner acts
+ * through, a few customers with their cars, new and used cars in stock, parts with reorder levels
+ * and bins at site A, and a second site with minimums but no stock and no staff (site A tops it up).
  */
 describe("simulation runner", () => {
   let org: Awaited<ReturnType<typeof resetWithWorkshop>>;
@@ -31,7 +33,7 @@ describe("simulation runner", () => {
     const existing = new Set((await db.labourOperation.findMany({ select: { code: true } })).map((o) => o.code));
     await db.labourOperation.createMany({ data: [...codes].filter((c) => !existing.has(c)).map((code) => ({ code, label: code, category: "SERVICE", standardCentiHours: 60 })) });
 
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 30; i++) {
       const company = i % 4 === 3;
       const c = await on((ctx) =>
         createCustomer(ctx, company ? { kind: "COMPANY", companyName: `Société ${i}`, paymentTermsDays: 30, homeSiteId: site } : { kind: "INDIVIDUAL", firstName: `Client${i}`, lastName: "Test", homeSiteId: site }),
@@ -69,12 +71,25 @@ describe("simulation runner", () => {
         vehicle: { vin: "VF3DDDDD0K1111111", registration: "DD-111-DD", brandId: org.brand.id, make: "Peugeot", model: "2008", version: "Allure", mileage: 45_000, fuel: "PETROL", firstRegistration: "2022-04-01" },
       }),
     );
-    for (const p of [org.pads, org.filter, org.oil]) await on((ctx) => setStockLevels(ctx, { siteId: site, partId: p.id, minQty: 6, maxQty: 20 }));
+    for (const p of [org.pads, org.filter, org.oil]) await on((ctx) => setStockLevels(ctx, { siteId: site, partId: p.id, bin: "A-01", minQty: 6, maxQty: 20 }));
+    // Site B is short of pads (site A sends some on Thursdays); a part nobody stocks is ordered for customers.
+    await on((ctx) => setStockLevels(ctx, { siteId: org.siteB.id, partId: org.pads.id, minQty: 4, maxQty: 8 }));
+    await db.part.create({ data: { partNumber: "9677001580", description: "Window regulator", family: "BODY", brandId: org.brand.id, supplierId: org.partsSupplier.id, discountCodeId: org.code.id, retailPriceCents: 18_900, listCostCents: 11_200 } });
     await sys((ctx) => setBusinessDate(ctx, start));
 
     report = await runSimulation((await import("@/lib/context")).SYSTEM_ACTOR, {
       days: 30,
-      rates: { leadsPerDay: 1.5, workshopVisitsPerDay: 3, counterSalesPerDay: 2, voPurchasesPerWeek: 2, vnStockTarget: 4 },
+      rates: {
+        leadsPerDay: 1.5,
+        workshopVisitsPerDay: 3,
+        counterSalesPerDay: 2,
+        voPurchasesPerWeek: 3,
+        privateVoShare: 0.5,
+        vnStockTarget: 4,
+        insuranceJobRate: 0.25,
+        emergencyOrdersPerWeek: 3,
+        supplierVarianceRate: 0.6,
+      },
     });
   }, 240_000);
 
@@ -100,6 +115,20 @@ describe("simulation runner", () => {
     // Steps are taken by the site's own users, never by the system.
     const authors = await db.repairOrder.findMany({ select: { advisorId: true }, distinct: ["advisorId"] });
     expect(authors.map((a) => a.advisorId).sort()).toEqual([org.advisor.userId, org.workshopManager.userId].sort());
+  });
+
+  it("runs the Phase 9 activities: payment run, transfers, counts, emergency orders, variances, insurance, private sellers", async () => {
+    for (const step of ["supplier payment run", "stock transfer", "cycle count", "emergency order", "buy used car (private)"]) {
+      expect(report.counts[step] ?? 0, step).toBeGreaterThan(0);
+    }
+    expect(await db.supplierInvoice.count({ where: { varianceCents: { not: 0 } } })).toBeGreaterThan(0);
+    expect(await db.roJob.count({ where: { payer: "INSURANCE", subletLines: { some: {} } } })).toBeGreaterThan(0);
+    expect(await db.voPurchase.count({ where: { source: "PRIVATE" } })).toBeGreaterThan(0);
+    expect(await db.stockItem.count({ where: { siteId: org.siteB.id, qtyOnHand: { gt: 0 } } })).toBeGreaterThan(0);
+    // The new cars received on 20 Feb (30-day terms) were paid by a Friday run and lettered.
+    const vn = await db.journalLine.findMany({ where: { partyId: org.oemSupplier.id, accountCode: { startsWith: "401" }, entryDate: new Date("2026-02-20"), creditCents: { gt: 0 } } });
+    expect(vn.length).toBe(4);
+    expect(vn.every((l) => l.letteringCode)).toBe(true);
   });
 
   it("has no step refused by the business rules on this org", () => {

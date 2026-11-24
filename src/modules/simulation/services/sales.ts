@@ -102,17 +102,21 @@ async function newPriceCents(make: string, model: string) {
 
 /** A used car bought from a trader the group already buys from, modelled on a car it has handled. */
 async function buyVo(sim: Sim, site: SiteCast) {
-  const [past, total] = await Promise.all([
+  const fromPrivate = chance(sim.rng, sim.rates.privateVoShare);
+  const [past, privates, total] = await Promise.all([
     db.voPurchase.findMany({ where: { source: "PROFESSIONAL", supplierId: { not: null } }, select: { supplierId: true, vatRegime: true }, distinct: ["supplierId"] }),
+    fromPrivate ? db.customer.findMany({ where: { homeSiteId: site.id, kind: "INDIVIDUAL" }, select: { id: true }, orderBy: { number: "asc" } }) : Promise.resolve([]),
     db.vehicle.count({ where: { stockType: "VO" } }),
   ]);
-  if (!past.length || !total) return;
-  const seller = pick(sim.rng, past);
+  if (!total || (fromPrivate ? !privates.length : !past.length)) return;
+  const seller = fromPrivate ? null : pick(sim.rng, past);
+  const privateSeller = fromPrivate ? pick(sim.rng, privates) : null;
   const model = await db.vehicle.findFirstOrThrow({ where: { stockType: "VO" }, orderBy: { vin: "asc" }, skip: Math.floor(sim.rng() * total) });
   const age = between(sim.rng, 1, 5);
   const mileage = Math.round((age * between(sim.rng, 9_000, 18_000)) / 100) * 100;
   const market = marketValueCents(await newPriceCents(model.make, model.model), age, mileage);
-  const priceIncl = round100(market * (0.72 + sim.rng() * 0.1));
+  // A private seller accepts a little less than the trade.
+  const priceIncl = round100(market * (fromPrivate ? 0.66 + sim.rng() * 0.1 : 0.72 + sim.rng() * 0.1));
   let vin = "";
   for (let i = 0; i < 20 && !vin; i++) {
     const c = generateVin(model.vin.slice(0, 3), sim.rng, "K");
@@ -124,14 +128,15 @@ async function buyVo(sim: Sim, site: SiteCast) {
     if (!(await db.vehicle.findUnique({ where: { registration: c }, select: { id: true } }))) registration = c;
   }
   if (!vin || !registration) return;
-  await sim.step("buy used car", site.salesManager, site.id, (ctx) =>
+  const paymentMethod = chance(sim.rng, 0.8) ? ("TRANSFER" as const) : ("CHEQUE" as const);
+  const lot = `LOT-${String(between(sim.rng, 0, 999_999)).padStart(6, "0")}`;
+  const terms = privateSeller
+    ? { source: "PRIVATE" as const, customerId: privateSeller.id, vatRegime: "MARGIN" as const, priceCents: priceIncl, paymentMethod }
+    : { source: "PROFESSIONAL" as const, supplierId: seller!.supplierId!, vatRegime: seller!.vatRegime, priceCents: seller!.vatRegime === "STANDARD" ? round100(priceIncl / 1.2) : priceIncl, supplierReference: lot };
+  await sim.step(privateSeller ? "buy used car (private)" : "buy used car", site.salesManager, site.id, (ctx) =>
     purchaseVo(ctx, {
       siteId: site.id,
-      source: "PROFESSIONAL",
-      supplierId: seller.supplierId!,
-      vatRegime: seller.vatRegime,
-      priceCents: seller.vatRegime === "STANDARD" ? round100(priceIncl / 1.2) : priceIncl,
-      supplierReference: `LOT-${String(between(sim.rng, 0, 999_999)).padStart(6, "0")}`,
+      ...terms,
       vehicle: {
         vin,
         registration,

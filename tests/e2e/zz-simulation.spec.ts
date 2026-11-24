@@ -30,7 +30,10 @@ test.describe("Flow 7 — simulation", () => {
     const before = (await date.textContent())!.trim();
     await page.locator('select[name="days"]').selectOption("1");
     await page.getByTestId("form-submit").click();
+    // The run goes on in the background (D-079): the panel polls its progress, then the page refreshes.
+    await expect(page.getByText("Simulation started")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText("Simulation finished")).toBeVisible({ timeout: 120_000 });
+    await expect(page.getByTestId("sim-job")).toHaveCount(0);
     await expect(date).toHaveText(nextDay(before));
     const latest = page.getByTestId("sim-runs").locator("tbody tr").first();
     await expect(latest).toContainText("Balanced");

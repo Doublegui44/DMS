@@ -313,3 +313,18 @@ An internal RO prepares a used car in stock (INTAKE, RECONDITIONING, FOR_SALE or
 - `.github/workflows/ci.yml`: on every push and pull request, job `checks` runs typecheck, lint and Vitest against a Postgres 17 service; job `e2e` then runs Playwright on the production build and uploads the traces when it fails.
 - The env files for tests are not committed (they hold local socket URLs), so CI writes `.env.test` and `.env.e2e` with TCP URLs and CI-only secrets. `assertSafeDatabase` accepts them (local host, `dms_*` name).
 
+
+## D-078 — Supplier payment run
+- `runSupplierPayments(ctx, { siteId, method?, supplierIds? })` (accounting, needs `accounting.payment:create`) pays every supplier of the site what is due: unlettered 40x lines (408 excluded) are rebuilt as open items FIFO (as D-064), and an item is due once its entry date + the supplier's payment terms is reached. Only items still whole are paid (`dueSupplierItems`, pure); a part-paid item waits for a person.
+- One payment per supplier and account (401000 or 401100), lettered with the items it pays, so payables age and clear as in a real dealership. Parts supplier invoices are left out (`OWN_PAYMENT_FLOW`): they are paid one by one through `paySupplierInvoice` (D-050).
+- The runner calls it on Fridays as the accountant. Seeded history still leaves vehicle purchases unpaid (D-039); the first Friday of a run pays what has fallen due.
+
+## D-079 — Background simulation jobs
+- The admin screen starts a run with `startSimulationJob` and returns at once; the runner goes on in the Node process and updates one in-memory job (`globalThis`, so it survives hot reloads): days done, current date, steps, status. The panel polls it every 1.5 s and refreshes the page at the end.
+- One job at a time per server (a second start is a `ConflictError`). Stop sets a flag the runner reads before each day (`shouldStop`), so a day is never cut in half; the report records `stopped`.
+- No job table: a restart loses the job but not its work (every step committed on its own, D-071), and the `SimulationRun` event is written only when the run ends. The CLI still runs in the foreground.
+
+## D-080 — Phase 9 activities and rates
+- Parts: emergency orders for parts the site does not stock (`emergencyOrdersPerWeek`), transfers on Thursdays from a site that has stock to the sites below their minimum, a cycle count of one aisle on the first Tuesday of the month, supplier invoices with a price variance (`supplierVarianceRate`: small ones within the tolerance, large ones held in VARIANCE and approved or rejected 1–4 days later).
+- Workshop: insurance jobs with a bodyshop sublet (`insuranceJobRate`); an additional job is approved only if its parts are on the shelf, otherwise declined, so a repair order never waits on parts the runner will not order.
+- Sales: a share of used-car purchases are from private sellers (`privateVoShare`, margin VAT, paid by transfer or cheque).

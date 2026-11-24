@@ -4,7 +4,12 @@ import { db } from "@/lib/db";
 import {
   addCounterLine,
   createCounterSale,
+  createCycleCount,
+  createPurchaseOrder,
   createSuggestedOrders,
+  postCycleCount,
+  recordCounts,
+  transferStock,
   decideSupplierInvoice,
   invoiceCounterSale,
   paySupplierInvoice,
@@ -12,10 +17,14 @@ import {
   recordSupplierInvoice,
   sendPurchaseOrder,
 } from "@/modules/parts";
-import { between, pick, poisson, unit, unitInt, weighted } from "../domain/random";
+import { between, chance, perOpenDay, pick, poisson, unit, unitInt, weighted } from "../domain/random";
 import type { Sim, SiteCast } from "./shared";
 
-/** The parts department of one site for one day: deliveries, supplier invoices, the counter, Monday orders. */
+/**
+ * The parts department of one site for one day: deliveries, supplier invoices, the counter,
+ * Monday orders, customer (emergency) orders, Thursday transfers to sites that are short, and the
+ * monthly cycle count on the first Tuesday.
+ */
 export async function partsDay(sim: Sim, site: SiteCast) {
   await receiveDeliveries(sim, site);
   await supplierInvoices(sim, site);
@@ -24,7 +33,11 @@ export async function partsDay(sim: Sim, site: SiteCast) {
     const customers = await db.customer.findMany({ where: { homeSiteId: site.id, kind: { in: ["INDIVIDUAL", "COMPANY"] } }, select: { id: true, kind: true }, orderBy: { number: "asc" } });
     for (let i = 0; i < sales && customers.length; i++) await counterSale(sim, site, customers);
   }
-  if (sim.day.getUTCDay() === 1) await replenish(sim, site);
+  const weekday = sim.day.getUTCDay();
+  if (weekday === 1) await replenish(sim, site);
+  if (weekday !== 6 && chance(sim.rng, perOpenDay(sim.rates.emergencyOrdersPerWeek) * 1.2)) await emergencyOrder(sim, site);
+  if (weekday === 4) await transfers(sim, site);
+  if (weekday === 2 && sim.day.getUTCDate() <= 7) await cycleCount(sim, site);
 }
 
 /** Orders due today arrive; one in twelve comes short and the rest follows a few days later. */
@@ -62,20 +75,34 @@ async function supplierInvoices(sim: Sim, site: SiteCast) {
   for (const r of receipts) {
     const open = r.lines.filter((l) => Number(l.qty) > Number(l.qtyInvoiced));
     if (!open.length || addDays(r.receivedOn, unitInt(seed, r.id, "invoice", 2, 8)) > sim.day) continue;
-    const ref = `F-${r.number}-${isoDate(sim.day).replaceAll("-", "")}`;
+    // The first invoice of a delivery is sometimes at another price on one line; a corrected one never is.
+    const corrected = (await db.supplierInvoiceLine.count({ where: { receiptLineId: { in: r.lines.map((l) => l.id) } } })) > 0;
+    const variance = !corrected && unit(seed, r.id, "price") < sim.rates.supplierVarianceRate;
+    const factor = unit(seed, r.id, "price-size") < 0.6 ? 1.004 : 1.12 + unit(seed, r.id, "price-up") * 0.13;
+    const bumped = unitInt(seed, r.id, "price-line", 0, open.length - 1);
     await sim.step("supplier invoice", site.partsManager, site.id, (ctx) =>
       recordSupplierInvoice(ctx, {
         siteId: site.id,
         supplierId: r.supplierId,
-        supplierReference: ref,
+        supplierReference: `F-${r.number}-${isoDate(sim.day).replaceAll("-", "")}`,
         invoiceDate: isoDate(sim.day),
-        lines: open.map((l) => ({ receiptLineId: l.id, qty: String(Number(l.qty) - Number(l.qtyInvoiced)) })),
+        notes: corrected ? "Corrected invoice" : null,
+        lines: open.map((l, i) => ({
+          receiptLineId: l.id,
+          qty: String(Number(l.qty) - Number(l.qtyInvoiced)),
+          unitCostCents: variance && i === bumped ? Math.round(l.unitCostCents * factor) : undefined,
+        })),
       }),
     );
   }
-  const variances = await db.supplierInvoice.findMany({ where: { siteId: site.id, status: "VARIANCE", invoiceDate: { lte: addDays(sim.day, -2) } }, select: { id: true }, orderBy: { number: "asc" } });
+  // Price differences are settled a few days later: most increases are confirmed, some refused (a corrected invoice follows).
+  const variances = await db.supplierInvoice.findMany({ where: { siteId: site.id, status: "VARIANCE" }, select: { id: true, invoiceDate: true }, orderBy: { number: "asc" } });
   for (const v of variances) {
-    await sim.step("supplier variance", site.partsManager, site.id, (ctx) => decideSupplierInvoice(ctx, v.id, "APPROVE", "Price increase confirmed by the supplier"));
+    if (addDays(v.invoiceDate, unitInt(seed, v.id, "decide", 1, 4)) > sim.day) continue;
+    const approve = unit(seed, v.id, "approve") < 0.75;
+    await sim.step(approve ? "supplier variance approved" : "supplier invoice rejected", site.partsManager, site.id, (ctx) =>
+      decideSupplierInvoice(ctx, v.id, approve ? "APPROVE" : "REJECT", approve ? "Price increase confirmed by the supplier" : "Price not agreed: corrected invoice requested"),
+    );
   }
   const due = await db.supplierInvoice.findMany({ where: { siteId: site.id, status: "MATCHED", dueDate: { lte: sim.day } }, select: { id: true }, orderBy: { number: "asc" } });
   for (const inv of due) {
@@ -126,5 +153,58 @@ async function replenish(sim: Sim, site: SiteCast) {
     });
     for (const po of drafts) await sendPurchaseOrder(ctx, po.id);
     return drafts.length || null;
+  });
+}
+
+/** A part the site does not stock, ordered for a customer and delivered the next day. */
+async function emergencyOrder(sim: Sim, site: SiteCast) {
+  const where = { brandId: { in: site.brandIds }, active: true, stock: { none: { siteId: site.id } }, replacedBy: null };
+  const total = await db.part.count({ where });
+  if (!total) return;
+  const part = await db.part.findFirstOrThrow({ where, orderBy: { partNumber: "asc" }, skip: Math.floor(sim.rng() * total) });
+  await sim.step("emergency order", site.partsManager, site.id, async (ctx) => {
+    const po = await createPurchaseOrder(ctx, { siteId: site.id, supplierId: part.supplierId, kind: "EMERGENCY", notes: "Customer order", lines: [{ partNumber: part.partNumber, qty: "1" }] });
+    return sendPurchaseOrder(ctx, po.id);
+  });
+}
+
+/** Thursdays: a few units sent to each other site that is below its minimum, from what this site has above its own. */
+async function transfers(sim: Sim, site: SiteCast) {
+  const others = await db.site.findMany({ where: { id: { not: site.id } }, select: { id: true }, orderBy: { code: "asc" } });
+  for (const to of others) {
+    const rows = await db.$queryRaw<{ partNumber: string; qty: number }[]>`
+      SELECT p."partNumber", LEAST(t."minQty" - (t."qtyOnHand" - t."qtyReserved"), (s."qtyOnHand" - s."qtyReserved") - s."minQty")::int AS qty
+      FROM stock_item t
+      JOIN stock_item s ON s."partId" = t."partId" AND s."siteId" = ${site.id}
+      JOIN part p ON p.id = t."partId"
+      WHERE t."siteId" = ${to.id} AND t."minQty" > 0 AND t."qtyOnHand" - t."qtyReserved" < t."minQty"
+        AND s."qtyOnHand" - s."qtyReserved" - s."minQty" >= 1 AND p.unit = 'EA'
+      ORDER BY p."partNumber" LIMIT 3`;
+    const lines = rows.filter((r) => r.qty >= 1).map((r) => ({ partNumber: r.partNumber, qty: String(r.qty) }));
+    if (!lines.length) continue;
+    await sim.step("stock transfer", site.partsManager, site.id, (ctx) => transferStock(ctx, { fromSiteId: site.id, toSiteId: to.id, notes: "Rebalancing between sites", lines }));
+  }
+}
+
+/** First Tuesday of the month: one aisle counted (in turn); about one item in eight is a unit off. */
+async function cycleCount(sim: Sim, site: SiteCast) {
+  const bins = await db.stockItem.findMany({ where: { siteId: site.id, bin: { not: null } }, select: { bin: true }, distinct: ["bin"] });
+  const aisles = [...new Set(bins.map((b) => b.bin!.charAt(0).toUpperCase()))].sort();
+  if (!aisles.length) return;
+  const month = sim.day.getUTCFullYear() * 12 + sim.day.getUTCMonth();
+  const aisle = aisles[month % aisles.length];
+  await sim.step("cycle count", site.partsManager, site.id, async (ctx) => {
+    const count = await createCycleCount(ctx, { siteId: site.id, label: `Monthly count ${isoDate(sim.day).slice(0, 7)} — aisle ${aisle}`, binPrefix: aisle, limit: 25 });
+    const lines = await ctx.tx.cycleCountLine.findMany({ where: { countId: count.id }, include: { stockItem: { select: { part: { select: { unit: true } } } } }, orderBy: { id: "asc" } });
+    await recordCounts(ctx, count.id, {
+      lines: lines.map((l) => {
+        const expected = Number(l.expectedQty);
+        const step = l.stockItem.part.unit === "L" ? 0.5 : 1;
+        const off = unit(sim.rates.seed, l.id, "off") < 0.12;
+        const up = unit(sim.rates.seed, l.id, "up") < 0.35;
+        return { lineId: l.id, countedQty: String(off ? Math.max(0, expected + (up ? step : -step)) : expected) };
+      }),
+    });
+    return postCycleCount(ctx, count.id);
   });
 }

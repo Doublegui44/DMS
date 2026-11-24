@@ -1,6 +1,6 @@
 import { addDays } from "@/lib/dates";
 import { db } from "@/lib/db";
-import { postManualEntry, recordPayment } from "@/modules/accounting";
+import { postManualEntry, recordPayment, runSupplierPayments } from "@/modules/accounting";
 import { unit, unitInt } from "../domain/random";
 import type { Sim, SiteCast } from "./shared";
 
@@ -11,12 +11,17 @@ const month = (d: Date) => d.toISOString().slice(0, 7);
  * amounts as last time), and customers paying their invoices: on their due date, or 10 to 60 days
  * late for a share of them (`latePaymentRate`), so the ageing report always has overdue items.
  * Car sales are paid through the order (sales activity) and warranty claims by the manufacturer's
- * remittance (workshop activity), so they are left out here.
+ * remittance (workshop activity), so they are left out here. On Fridays the payment run pays the
+ * suppliers of cars, car costs and sublets what is due (D-078).
  */
 export async function accountingDay(sim: Sim, site: SiteCast) {
   const actor = sim.cast.accountant;
   if (sim.day.getUTCDate() === 1) await rent(sim, site);
   if (sim.day.getUTCDate() === 28) await salaries(sim, site);
+  // Fridays: suppliers of cars, car costs and sublets are paid what is due (parts invoices are paid one by one).
+  if (sim.day.getUTCDay() === 5) {
+    await sim.step("supplier payment run", actor, site.id, async (ctx) => (await runSupplierPayments(ctx, { siteId: site.id })).length || null);
+  }
 
   const open = await db.invoice.findMany({
     where: {

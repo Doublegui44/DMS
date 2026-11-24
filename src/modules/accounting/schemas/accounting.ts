@@ -89,3 +89,11 @@ export const paymentInputSchema = z
   })
   .refine((p) => !!p.customerId !== !!p.supplierId, { message: "Choose a customer or a supplier", path: ["customerId"] });
 export type PaymentInput = z.input<typeof paymentInputSchema>;
+
+/** A supplier payment run for one site (D-078): every supplier, or the ones listed. */
+export const supplierPaymentRunInputSchema = z.object({
+  siteId: z.string().min(1, "Site is required"),
+  method: z.enum(["TRANSFER", "CHEQUE"]).default("TRANSFER"),
+  supplierIds: z.array(z.string().min(1)).optional(),
+});
+export type SupplierPaymentRunInput = z.input<typeof supplierPaymentRunInputSchema>;

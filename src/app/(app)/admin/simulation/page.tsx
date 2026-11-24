@@ -1,9 +1,10 @@
 import { getTranslations } from "next-intl/server";
 import { query } from "@/lib/session";
 import { formatDate, formatDateTime } from "@/lib/dates";
-import { getSimulationStatus } from "@/modules/simulation";
+import { getSimulationJob, getSimulationStatus } from "@/modules/simulation";
 import { PageHeader, Section } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { JobPanel } from "./job-panel";
 import { RunForm } from "./run-form";
 
 export const metadata = { title: "Simulation" };
@@ -12,7 +13,7 @@ const steps = (counts: Record<string, number>) => Object.entries(counts).reduce(
 
 export default async function SimulationPage() {
   const t = await getTranslations("simulation");
-  const { businessDate, sites, defaults, runs } = await query((ctx) => getSimulationStatus(ctx), { resource: "admin.simulation", action: "view" });
+  const { businessDate, sites, defaults, runs, job } = await query(async (ctx) => ({ ...(await getSimulationStatus(ctx)), job: await getSimulationJob(ctx) }), { resource: "admin.simulation", action: "view" });
   const last = runs[0];
 
   return (
@@ -20,7 +21,8 @@ export default async function SimulationPage() {
       <PageHeader title={t("title")} subtitle={t("subtitle")} />
       <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
         <Section title={t("run")}>
-          <div className="p-4">
+          <div className="space-y-4 p-4">
+            <JobPanel key={job?.id ?? "none"} initial={job} />
             <RunForm sites={sites.map((s) => ({ slug: s.slug, name: s.name }))} defaults={defaults} />
           </div>
         </Section>
@@ -72,6 +74,7 @@ export default async function SimulationPage() {
                     </td>
                     <td className="px-4 py-1.5">
                       <StatusBadge status={r.ok ? "ok" : "critical"} label={r.ok ? t("ok") : t("failed")} />
+                      {r.stopped && <StatusBadge status="stopped" tone="amber" label={t("stopped")} className="ml-1" />}
                       {r.error && <p className="mt-1 text-xs text-destructive">{r.error}</p>}
                     </td>
                   </tr>

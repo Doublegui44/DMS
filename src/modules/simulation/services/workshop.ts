@@ -5,6 +5,7 @@ import {
   addJob,
   addLabourLine,
   addPartLine,
+  addSubletLine,
   bookAppointment,
   cancelAppointment,
   checkIn,
@@ -155,6 +156,8 @@ async function visit(
     !!v.car.brandId && site.brandIds.includes(v.car.brandId) && !!v.car.firstRegistration && v.car.firstRegistration > addDays(sim.day, -3 * 365) && chance(sim.rng, 0.5);
   const warranty = underWarranty ? pickTemplate(sim, WARRANTY_TEMPLATES) : null;
   const tech = freestTech(site, cursor);
+  const insured = chance(sim.rng, sim.rates.insuranceJobRate) ? await insuranceParties(sim) : null;
+  const subletCost = between(sim.rng, 220, 480) * 100;
   const km = between(sim.rng, 400, 18_000);
   const fuel = pick(sim.rng, [0, 25, 50, 75, 100]);
   const damage = chance(sim.rng, 0.2) ? [{ zone: pick(sim.rng, ["FRONT", "REAR", "LEFT", "RIGHT"] as const), note: pick(sim.rng, ["scratch", "small dent", "scuffed bumper", "chipped paint"]) }] : [];
@@ -177,9 +180,23 @@ async function visit(
       const w = await addJob(ctx, ro.id, { description: warranty.description, payer: "WARRANTY", technicianId: first.technicianId ?? tech });
       await fillJob(ctx, ro.id, w.id, site.id, warranty, v.car.brandId);
     }
+    if (insured) {
+      const j = await addJob(ctx, ro.id, { description: "Windscreen replacement (insurance claim)", payer: "INSURANCE", payerCustomerId: insured.insurerId });
+      await addSubletLine(ctx, ro.id, j.id, { supplierId: insured.bodyshopId, label: "Windscreen replacement", costCents: subletCost, priceCents: Math.round(subletCost * 1.3) });
+    }
     return ro;
   });
   if (ro) await work(sim, site, cursor, ro.id);
+}
+
+/** An insurer (one of the group's first company accounts, as in the seed) and the bodyshop doing the work. */
+async function insuranceParties(sim: Sim) {
+  const [insurers, bodyshop] = await Promise.all([
+    db.customer.findMany({ where: { kind: "COMPANY" }, select: { id: true }, orderBy: { number: "asc" }, take: 3 }),
+    db.supplier.findFirst({ where: { name: { startsWith: "Carrosserie" } }, select: { id: true }, orderBy: { name: "asc" } }),
+  ]);
+  if (!insurers.length || !bodyshop) return null;
+  return { insurerId: pick(sim.rng, insurers).id, bodyshopId: bodyshop.id };
 }
 
 /** Cars checked in on earlier days are worked on until they go home. */
@@ -215,8 +232,11 @@ async function work(sim: Sim, site: SiteCast, cursor: Cursor, roId: string) {
       await fillJob(ctx, roId, j.id, site.id, extra, ro.vehicle.brandId);
       if (!leaves) return true; // the customer is called; the answer comes tomorrow
     }
-    for (const j of await ctx.tx.roJob.findMany({ where: { roId, status: "OPEN", approval: "PENDING" }, orderBy: { lineNo: "asc" } })) {
-      await decideJob(ctx, roId, j.id, { approve: approved, note: approved ? "Agreed by phone" : "Customer will come back later" });
+    for (const j of await ctx.tx.roJob.findMany({ where: { roId, status: "OPEN", approval: "PENDING" }, include: { partLines: { where: { issued: false } } }, orderBy: { lineNo: "asc" } })) {
+      // Parts are issued on approval: if the shelf emptied since the quote, the work waits for another visit.
+      const inStock = await partsOnShelf(ctx, ro.siteId, j.partLines);
+      const go = approved && inStock;
+      await decideJob(ctx, roId, j.id, { approve: go, note: go ? "Agreed by phone" : approved ? "Parts out of stock: booked for another visit" : "Customer will come back later" });
     }
     const jobs = await ctx.tx.roJob.findMany({
       where: { roId, status: "OPEN", approval: { in: ["NOT_REQUIRED", "APPROVED"] } },
@@ -238,6 +258,18 @@ async function work(sim: Sim, site: SiteCast, cursor: Cursor, roId: string) {
       if (company || paysNow) await closeRepairOrder(ctx, roId);
     }
     return true;
+  });
+}
+
+/** Whether the site has the free stock to issue these part lines now. */
+async function partsOnShelf(ctx: ServiceContext, siteId: string, lines: { partId: string; qty: { toString(): string } }[]) {
+  const need = new Map<string, number>();
+  for (const l of lines) need.set(l.partId, (need.get(l.partId) ?? 0) + Number(l.qty.toString()));
+  if (!need.size) return true;
+  const items = await ctx.tx.stockItem.findMany({ where: { siteId, partId: { in: [...need.keys()] } }, select: { partId: true, qtyOnHand: true, qtyReserved: true } });
+  return [...need].every(([partId, qty]) => {
+    const item = items.find((i) => i.partId === partId);
+    return !!item && Number(item.qtyOnHand) - Number(item.qtyReserved) >= qty;
   });
 }
 

@@ -1688,15 +1688,26 @@
       "financingRate": "Quotes with financing",
       "cancellationRate": "Orders cancelled",
       "voPurchasesPerWeek": "Used cars bought per week",
+      "privateVoShare": "Share bought from private sellers",
       "vnStockTarget": "New cars kept per brand",
       "workshopVisitsPerDay": "Workshop visits per day",
       "bookedShare": "Visits booked ahead",
       "additionalWorkRate": "Visits with additional work",
+      "insuranceJobRate": "Visits with an insurance job",
       "internalRepairsPerWeek": "Used cars prepared per week",
       "counterSalesPerDay": "Parts counter sales per day",
+      "emergencyOrdersPerWeek": "Customer parts orders per week",
+      "supplierVarianceRate": "Supplier invoices with a price difference",
       "latePaymentRate": "Invoices paid late",
       "seed": "Random seed"
     },
-    "daysShort": "Days"
+    "daysShort": "Days",
+    "started": "Simulation started",
+    "running": "Running",
+    "stopping": "Stopping after this day",
+    "progress": "{done} of {days} days",
+    "stepsCount": "{n} steps",
+    "stop": "Stop",
+    "stopped": "Stopped"
   }
 }

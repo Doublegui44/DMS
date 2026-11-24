@@ -107,11 +107,11 @@ Each phase ends with: migrations applied, seed updated, tests green, app running
 - [x] CI workflow (GitHub Actions + Postgres): typecheck, lint, Vitest, Playwright (D-077)
 - **Done when:** the full e2e suite passes twice in a row on a production build, and CI runs on every push ✔ locally: 31/31 twice, 4.7 and 4.6 min (was 15.7 min on the dev server). The workflow runs once the commit is pushed.
 
-## Phase 9 — Simulator completeness
-- [ ] Supplier payment run for vehicle purchases (OEMs and traders), so payables age realistically (D-064)
-- [ ] Activities the seed has and the runner lacks: stock transfers between sites, monthly cycle counts, insurance jobs with sublets, supplier invoice variances and rejections, VO bought from private sellers
-- [ ] Long runs in the background from the admin screen, with progress
-- **Done when:** a 30-day run exercises every desk and every flow above, and the invariants still hold
+## Phase 9 — Simulator completeness ✅
+- [x] Supplier payment run for vehicle purchases (OEMs and traders), so payables age realistically (D-064, D-078)
+- [x] Activities the seed has and the runner lacks: stock transfers between sites, monthly cycle counts, insurance jobs with sublets, supplier invoice variances and rejections, VO bought from private sellers, plus emergency parts orders (D-080)
+- [x] Long runs in the background from the admin screen, with progress and Stop (D-079)
+- **Done when:** a 30-day run exercises every desk and every flow above, and the invariants still hold ✔ (`tests/integration/simulation.test.ts`, 10 runs in a row with no refused step)
 
 ## Phase 10 — Translations and integrations
 - [ ] French translation (then Spanish)

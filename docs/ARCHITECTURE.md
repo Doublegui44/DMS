@@ -176,7 +176,7 @@ modules/<name>/
 ### 5.5 Business clock and simulation
 - `BusinessClock` (single row): `currentDate`. `ctx.businessDate` is read once per command.
 - `advanceBusinessDay()` emits `BusinessDayAdvanced`; its handlers expire reservations and quotes. Ageing and overdue are computed from the business date when read (D-073).
-- The scenario runner (`modules/simulation`) loops day by day: on open days each site's accounts, sales, workshop and parts desks call the services as the site's own users, one transaction per step, then the clock advances. Counts come from rates (Poisson, seeded stream); decisions about a record are drawn from its id, so the runner is stateless and resumable (D-071, D-072). Each run is reported as a `SimulationRun` event with its invariants (journal balanced, stock accounts = sub-ledgers) (D-075).
+- The scenario runner (`modules/simulation`) loops day by day: on open days each site's accounts, sales, workshop and parts desks call the services as the site's own users, one transaction per step, then the clock advances. Counts come from rates (Poisson, seeded stream); decisions about a record are drawn from its id, so the runner is stateless and resumable (D-071, D-072). Each run is reported as a `SimulationRun` event with its invariants (journal balanced, stock accounts = sub-ledgers) (D-075). The admin screen runs it as a background job with progress and Stop, one at a time (D-079); suppliers are paid by a Friday payment run (D-078).
 
 ### 5.6 Validation and errors
 Zod at the edge (action) **and** inside the service (defence in depth for CLI callers). Business rule violations raise typed `DomainError(code, params)` mapped to translated messages in the UI.

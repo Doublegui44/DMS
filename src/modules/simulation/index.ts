@@ -5,3 +5,4 @@ export * from "./domain/random";
 export * from "./domain/templates";
 export { runSimulation, checkSimulationInvariants, type SimulationReport, type SimulationInvariants } from "./services/runner";
 export { getSimulationStatus, type SimulationRunRow } from "./queries/runs";
+export { startSimulationJob, stopSimulationJob, getSimulationJob, type SimulationJob } from "./services/jobs";
