@@ -7,9 +7,10 @@
   "author": "DMS Simulator",
   "main": "dist/main.mjs",
   "scripts": {
-    "build:main": "esbuild src/main.ts --bundle --platform=node --format=esm --target=node22 --packages=external --external:electron --outfile=dist/main.mjs && cp src/splash.html dist/splash.html",
+    "build:main": "esbuild src/main.ts --bundle --platform=node --format=esm --target=node22 --packages=external --external:electron --outfile=dist/main.mjs && cp src/splash.html dist/splash.html && cp assets/icon.svg dist/icon.svg",
     "build:server": "node scripts/build-server.mjs",
     "build:dump": "node scripts/make-dump.mjs",
+    "build:icons": "node scripts/make-icons.mjs",
     "typecheck": "tsc --noEmit",
     "start": "npm run build:main && electron .",
     "dist:mac": "npm run build:main && electron-builder --mac --publish never",
@@ -66,10 +67,12 @@
         }
       ],
       "category": "public.app-category.business",
+      "icon": "assets/icon-mac.png",
       "identity": "-",
       "hardenedRuntime": false
     },
     "win": {
+      "icon": "assets/icon-win.png",
       "target": [
         {
           "target": "nsis",

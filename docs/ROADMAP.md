@@ -140,17 +140,17 @@ Goal: an installer that anyone can run on a Mac or a Windows PC with nothing els
 - [x] Demo dump: `npm run build:dump` seeds a throwaway Postgres and writes `demo.sql.gz` + `manifest.json`; first-launch restore (~1 s); Reset and Reseed menu items.
 - [x] Electron shell: splash, window, menu, single instance, logs folder, external links and PDFs in the system apps.
 - [x] Mac build: `npm run dist:mac` builds a `.dmg` for the host's architecture (~206 MB, ad-hoc signed); Intel builds come from CI.
-- [x] Windows build: `.github/workflows/desktop.yml` on a `v*` tag or by hand (first run 45499524097: Windows x64 and macOS arm64 built and passed both smoke tests; macOS Intel built, its reseed test clicked sign-in before the page was ready, test fixed; second run 45886411566: macOS Intel quit on Reset because the dashboard was still loading, app fixed and the case now tested on every system): dump made once on Linux, then macOS arm64, macOS x64 and Windows x64 built and smoke-tested, installers in a draft GitHub Release.
-- [x] Smoke tests with Playwright's Electron support (`npm run test:smoke`): first launch, one-click sign-in, dashboard, PDF, one simulated day, quit and relaunch (data and session kept), Reset, Reseed. Pass on macOS arm64 locally and on Windows x64 and macOS arm64 in CI.
+- [x] Windows build: `.github/workflows/desktop.yml` on a `v*` tag or by hand (first run 45499524097: Windows x64 and macOS arm64 built and passed both smoke tests; macOS Intel built, its reseed test clicked sign-in before the page was ready, test fixed; second run 45886411566: macOS Intel quit on Reset because the dashboard was still loading, app fixed and the case now tested on every system; third run 45891584051: all three passed both smoke tests): dump made once on Linux, then macOS arm64, macOS x64 and Windows x64 built and smoke-tested, installers in a draft GitHub Release.
+- [x] Smoke tests with Playwright's Electron support (`npm run test:smoke`): first launch, one-click sign-in, dashboard, PDF, one simulated day, quit and relaunch (data and session kept), Reset, Reseed. Pass on macOS arm64 locally and on Windows x64, macOS arm64 and macOS Intel in CI.
 - [x] README: download, first-launch steps for unsigned apps, Reset and Reseed, building it yourself.
 - [x] Decision log: D-087.
+- [x] App icon: a gauge whose four segments are the department colours of the charts, on a navy tile (`desktop/assets/icon.svg`); the splash shows it too.
 - [ ] First Windows installer tried by hand on a Windows PC.
 
 **Decided**
 - Distribution: the repository is public, so the installers go to its own GitHub Releases. Auto-update can come later (electron-updater reads the same Releases).
 - Signing: unsigned for now (macOS ad-hoc, Open Anyway once; Windows SmartScreen once). Later, an Apple Developer ID ($99 a year, signing and notarisation) and a Windows certificate (for example Microsoft Trusted Signing, about $10 a month) remove the warnings.
 - Windows on ARM and Linux: out of scope unless someone needs them.
-- Still to do: an app icon (the default Electron icon is used).
 
 **Expect:** installers of roughly 200–300 MB; someone with a Windows PC tries the first installer by hand once.
 
