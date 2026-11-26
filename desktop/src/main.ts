@@ -65,10 +65,29 @@ let pgPort = 0;
 let server: UtilityProcess | null = null;
 let appPort = 0;
 let win: BrowserWindow | null = null;
-let busy = false;
+/** Startup, Reset and Reseed stop or start the server: the Demo menu waits until they are done. */
+let busy = true;
 let quitting = false;
+let failed = false;
 
 const appUrl = (p = "/") => `http://127.0.0.1:${appPort}${p}`;
+const splashFile = path.join(app.getAppPath(), "dist", "splash.html");
+
+/**
+ * Shows a page in the window. A load that a newer one replaces before it finishes rejects with
+ * ERR_ABORTED (-3), and at times so does the newer load although its page shows: the newer page
+ * wins, so that is not an error. It happens when Reset comes while a slow computer is still
+ * loading the page.
+ */
+async function show(target: string) {
+  try {
+    if (target === splashFile) await win?.loadFile(target);
+    else await win?.loadURL(target);
+  } catch (e) {
+    if ((e as { errno?: number }).errno !== -3) throw e;
+    log(`ERR_ABORTED loading ${target}: one page replaced another`);
+  }
+}
 
 function splash(status: string) {
   if (!win) return;
@@ -106,7 +125,7 @@ async function startDatabase() {
   if (plan !== "ready") await restore("Loading the demo data…");
 }
 
-function waitForHttp(url: string, timeoutMs: number): Promise<void> {
+function waitForHttp(url: string, timeoutMs: number, alive: () => boolean): Promise<void> {
   const until = Date.now() + timeoutMs;
   return new Promise((resolve, reject) => {
     const attempt = () => {
@@ -114,7 +133,11 @@ function waitForHttp(url: string, timeoutMs: number): Promise<void> {
         res.resume();
         resolve();
       });
-      req.on("error", () => (Date.now() > until ? reject(new Error(`No answer from ${url}`)) : setTimeout(attempt, 250)));
+      req.on("error", () => {
+        if (!alive()) reject(new Error("The application server stopped while starting; see server.log."));
+        else if (Date.now() > until) reject(new Error(`No answer from ${url}`));
+        else setTimeout(attempt, 250);
+      });
     };
     attempt();
   });
@@ -124,7 +147,7 @@ async function startServer() {
   appPort = await freePort();
   splash("Starting the application…");
   const out = fs.createWriteStream(path.join(logDir, "server.log"), { flags: "a" });
-  server = utilityProcess.fork(path.join(serverDir, "server.js"), [], {
+  const child = (server = utilityProcess.fork(path.join(serverDir, "server.js"), [], {
     cwd: serverDir,
     stdio: "pipe",
     serviceName: "DMS server",
@@ -140,15 +163,15 @@ async function startServer() {
       DEMO_MODE: "true",
       NEXT_TELEMETRY_DISABLED: "1",
     },
-  });
-  server.stdout?.pipe(out);
-  server.stderr?.pipe(out);
-  server.on("exit", (code) => {
+  }));
+  child.stdout?.pipe(out);
+  child.stderr?.pipe(out);
+  child.on("exit", (code) => {
     log(`Server exited with code ${code}`);
-    server = null;
-    if (!quitting && !busy) fail(new Error(`The application server stopped (code ${code}).`));
+    if (server === child) server = null;
+    if (!quitting && !busy) void fail(new Error(`The application server stopped (code ${code}).`));
   });
-  await waitForHttp(appUrl("/login"), 60_000);
+  await waitForHttp(appUrl("/login"), 60_000, () => server === child);
   log(`Server on ${appUrl()}`);
 }
 
@@ -173,6 +196,10 @@ async function stopAll() {
 
 async function fail(error: unknown) {
   log(`Error: ${error instanceof Error ? error.stack : String(error)}`);
+  // One dialog, and none on the way out (a reset cut short by Quit fails as Postgres stops).
+  if (failed || quitting) return;
+  failed = true;
+  busy = true; // the app is closing: the Demo menu does nothing more
   const r = await dialog.showMessageBox({
     type: "error",
     message: "DMS Simulator could not start",
@@ -198,7 +225,7 @@ function createWindow() {
     webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
   });
   win.once("ready-to-show", () => win?.show());
-  win.loadFile(path.join(app.getAppPath(), "dist", "splash.html"));
+  void win.loadFile(splashFile);
   const contents = win.webContents;
 
   // Other sites open in the system browser; PDFs open in the system viewer.
@@ -237,6 +264,18 @@ async function openPdf(url: string) {
   }
 }
 
+/** Runs startup, Reset or Reseed with the Demo menu on hold, then shows the app. An error ends the app. */
+async function whileBusy(step: () => Promise<void>) {
+  busy = true;
+  try {
+    await step();
+  } catch (e) {
+    return fail(e);
+  }
+  busy = false;
+  await show(appUrl("/")).catch(fail);
+}
+
 // ── Menu ─────────────────────────────────────────────────────────────────────
 async function resetDemo() {
   if (busy) return;
@@ -248,19 +287,13 @@ async function resetDemo() {
     defaultId: 1,
     cancelId: 1,
   });
-  if (r.response !== 0) return;
-  busy = true;
-  try {
-    await win!.loadFile(path.join(app.getAppPath(), "dist", "splash.html"));
+  if (r.response !== 0 || busy) return;
+  await whileBusy(async () => {
+    await show(splashFile);
     await stopServer();
     await restore("Resetting the demo data…");
     await startServer();
-    await win!.loadURL(appUrl("/"));
-  } catch (e) {
-    await fail(e);
-  } finally {
-    busy = false;
-  }
+  });
 }
 
 async function reseedDemo() {
@@ -273,32 +306,29 @@ async function reseedDemo() {
     defaultId: 1,
     cancelId: 1,
   });
-  if (r.response !== 0) return;
-  busy = true;
-  const started = Date.now();
-  const tick = setInterval(() => {
-    const s = Math.round((Date.now() - started) / 1000);
-    splash(`Generating six months of history… ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")} (usually 3–5 minutes)`);
-  }, 1000);
-  try {
-    await win!.loadFile(path.join(app.getAppPath(), "dist", "splash.html"));
-    await stopServer();
-    // Start from the shipped schema and data, then empty and reseed (the seed sets the date).
-    await restore("Preparing the database…");
-    state.restored = false;
-    saveState(state);
-    await runReseed();
-    state = { ...state, restored: true, dataBuiltOn: new Date().toISOString().slice(0, 10) };
-    saveState(state);
-    log(`Demo reseeded in ${Math.round((Date.now() - started) / 1000)} s`);
+  if (r.response !== 0 || busy) return;
+  await whileBusy(async () => {
+    const started = Date.now();
+    const tick = setInterval(() => {
+      const s = Math.round((Date.now() - started) / 1000);
+      splash(`Generating six months of history… ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")} (usually 3–5 minutes)`);
+    }, 1000);
+    try {
+      await show(splashFile);
+      await stopServer();
+      // Start from the shipped schema and data, then empty and reseed (the seed sets the date).
+      await restore("Preparing the database…");
+      state.restored = false;
+      saveState(state);
+      await runReseed();
+      state = { ...state, restored: true, dataBuiltOn: new Date().toISOString().slice(0, 10) };
+      saveState(state);
+      log(`Demo reseeded in ${Math.round((Date.now() - started) / 1000)} s`);
+    } finally {
+      clearInterval(tick);
+    }
     await startServer();
-    await win!.loadURL(appUrl("/"));
-  } catch (e) {
-    await fail(e);
-  } finally {
-    clearInterval(tick);
-    busy = false;
-  }
+  });
 }
 
 function runReseed(): Promise<void> {
@@ -323,7 +353,14 @@ function buildMenu() {
     {
       label: "Demo",
       submenu: [
-        { id: "sign-in", label: "Sign-in page", accelerator: "CmdOrCtrl+Shift+L", click: () => win?.loadURL(appUrl("/login")) },
+        {
+          id: "sign-in",
+          label: "Sign-in page",
+          accelerator: "CmdOrCtrl+Shift+L",
+          click: () => {
+            if (!busy) void show(appUrl("/login")).catch(fail);
+          },
+        },
         { type: "separator" },
         { id: "reset-demo", label: "Reset demo…", click: () => void resetDemo() },
         { id: "reseed-demo", label: "Reseed at today\u2019s date…", click: () => void reseedDemo() },
@@ -374,18 +411,15 @@ if (!app.requestSingleInstanceLock()) {
     win.focus();
   });
 
-  app.whenReady().then(async () => {
+  app.whenReady().then(() => {
     log(`Starting DMS Simulator ${app.getVersion()} (${process.platform} ${process.arch})`);
     saveState(state);
     buildMenu();
     createWindow();
-    try {
+    return whileBusy(async () => {
       await startDatabase();
       await startServer();
-      await win?.loadURL(appUrl("/"));
-    } catch (e) {
-      await fail(e);
-    }
+    });
   });
 
   app.on("window-all-closed", () => app.quit());
